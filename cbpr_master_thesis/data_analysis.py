@@ -7,6 +7,8 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 import pandas as pd
 from scipy import signal
+from cbpr_master_thesis.preprocessing_and_normalization import notch_filter, bandpass_filter, highpass_filter, convert_to_SI, normalize_raw_imu, normalize_EMG_all_channels
+from cbpr_master_thesis.feature_extraction import create_windows, extract_EMG_features
 
 #%% NORMALIZATION PARAMS
 
@@ -233,6 +235,8 @@ def undersample_majority_class_first_n(emg_data, imu_data, labels, target_sample
     return balanced_emg, balanced_imu, balanced_labels
 
 #%% DATA EXTRACTION AND BALANCING
+
+base_path = "C:/Users/claud/Desktop/CBPR_Recording_Folders/"
 
 def extract_and_balance(participant_folder, recording_numbers):
     data = {'emg_angles': [], 'imu_angles': [], 'label_angles': [], 
