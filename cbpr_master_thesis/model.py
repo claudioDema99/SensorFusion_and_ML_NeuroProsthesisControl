@@ -556,7 +556,7 @@ def inference_EMG_cnn(model, emg_input):
     return predicted
 
 
-#%% FCN FFNN network
+#%% FFNN network
 
 class Network(nn.Module):
     def __init__(self, **config):
