@@ -674,4 +674,3 @@ torch.save(model_angles_from_online_lstm.state_dict(), model_path_lstm)
 torch.save(model_raw_imu_from_online_lstm.state_dict(), model_path_lstm_raw_imu)
 torch.save(model_emg_from_online_lstm.state_dict(), model_path_lstm_emg)
 # %%
-questo è il nuovo branch
