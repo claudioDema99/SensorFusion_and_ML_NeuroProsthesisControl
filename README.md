@@ -19,6 +19,8 @@ The folder MATLAB contains the main Matlab code (from LocoD platform) used for m
 The ROS2 folder contains the packages used in ROS2 environment for managing real-time streaming, pipelines and inference of all the models, as well as storing of input vectors, predicitons, and the possibile to fine-tune the models on the stored dataset.
 All this behaviours are managed properly by a GUI that interacts with all the nodes and let you to control the overall infrastructure.
 
+MISSING IMAGES, MODELS, DATASET? NEED TO CHECK
+
 HOW TO RUN THE ROS2 INFRASTRUCTURE:
 YOU NEED ROS2 INSTALLED ON YOUR LINUX ENVIRONMENT, OR ON YOUR WSL (WINDOWS)
 YOU NEED TO DOWNLOAD THE ROS2 FOLDER, AND PUT THE TWO PACKAGES (DELSYS_PKG AND INTERFACE) INTO YOUR ROS2 WORKSPACE
