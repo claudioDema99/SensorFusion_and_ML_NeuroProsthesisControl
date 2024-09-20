@@ -57,7 +57,6 @@ def read(data_dir, name):
     x, y = torch.load(os.path.join(data_dir, filename))
     return x, y
 
-# LOAD AND LOG
 '''
 It loads the data and the labels from the locally saved numpy files.
 If wandb_enabled is True, the function will log the raw data to W&B. 
@@ -102,7 +101,6 @@ def load(no_weight_classification, name_dataset, name_labels):
         label[i] = label[i] - 1
     return data, label
 
-# PREPROCESS AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "raw-data" artifact 
 and preprocess it.
@@ -153,8 +151,8 @@ def train_val_dataset_and_log(wandb_enabled=False, windows=None, labels=None, mu
             raw_data_artifact = run.use_artifact('raw-data:latest')
             raw_dataset_dir = raw_data_artifact.download()
             raw_dataset, label = read(raw_dataset_dir, "raw_data")
-            window_lenght = 100  # Change this value as needed
-            overlap = 80
+            window_lenght = 200  # Change this value as needed
+            overlap = 100
             windows, labels = preprocess_and_window(raw_dataset, label, window_lenght, overlap, num_classes=4)
             emg_vector, imu_vector = get_new_feature_vector(windows)
             training_dataset, validation_dataset = get_tensor_dataset(emg_vector, imu_vector, labels, multiclass_problem)
@@ -227,7 +225,6 @@ def train_and_log(train_config, model_config, training_dataset=None, model=None,
             run.log_artifact(model_artifact)
     return model, train_loss, train_accuracy, criterion
 
-# EVALUATE AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "train-val-dataset" artifact, and the latest artifact from the "trained-network" artifact.
 '''
@@ -257,8 +254,8 @@ def pipeline_lstm(dataset_name, label_name, num_classes):
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 64],
         'hidden_sizes_imu': [128, 64, 64],
-        'input_shape_emg': (num_emg_channels,4),  # Assuming 11 time steps and 4 features for EMG
-        'input_shape_imu': 9,  # Assuming 9 features for IMU
+        'input_shape_emg': (num_emg_channels,4),
+        'input_shape_imu': 9,
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -293,8 +290,8 @@ def pipeline_raw_IMU_lstm(dataset_name, label_name, num_classes):
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 32],
         'hidden_sizes_imu': [128, 64, 32],
-        'input_shape_emg': num_emg_channels*4,  # Assuming 11 time steps and 4 features for EMG
-        'input_shape_imu': 18,  # Assuming 9 features for IMU
+        'input_shape_emg': num_emg_channels*4,
+        'input_shape_imu': 18,
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -342,7 +339,7 @@ def pipeline_EMG_lstm(dataset_name, label_name, num_classes):
     config = {
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 128, 64],
-        'input_shape_emg': (num_emg_channels, 4),  # Assuming 11 time steps and 4 features for EMG
+        'input_shape_emg': (num_emg_channels, 4),
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -372,12 +369,12 @@ def pipeline_EMG_lstm(dataset_name, label_name, num_classes):
 trained_model_lstm = pipeline_lstm("prova_senza5_dataset.npy", "prova_senza5_labels.npy", 6)
 model_path = 'model_params_lstm.pth'
 torch.save(trained_model_lstm.state_dict(), model_path)
-#trained_model_emg_lstm = pipeline_EMG_lstm("prova_senza5_dataset.npy", "prova_senza5_labels.npy", 6)
-#model_path = 'model_params_lstm_emg.pth'
-#torch.save(trained_model_emg_lstm.state_dict(), model_path)
-#trained_model_raw_imu_lstm = pipeline_raw_IMU_lstm("prova_senza5_dataset.npy", "prova_senza5_labels.npy", 6)
-#model_path = 'model_params_lstm_raw_imu.pth'
-#torch.save(trained_model_raw_imu_lstm.state_dict(), model_path)
+trained_model_emg_lstm = pipeline_EMG_lstm("prova_senza5_dataset.npy", "prova_senza5_labels.npy", 6)
+model_path = 'model_params_lstm_emg.pth'
+torch.save(trained_model_emg_lstm.state_dict(), model_path)
+trained_model_raw_imu_lstm = pipeline_raw_IMU_lstm("prova_senza5_dataset.npy", "prova_senza5_labels.npy", 6)
+model_path = 'model_params_lstm_raw_imu.pth'
+torch.save(trained_model_raw_imu_lstm.state_dict(), model_path)
 
 #%% Pipeline from online recordings
 
@@ -391,8 +388,8 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 64],
         'hidden_sizes_imu': [128, 64, 64],
-        'input_shape_emg': (num_emg_channels, 4),  # Assuming 11 time steps and 4 features for EMG
-        'input_shape_imu': 9,  # Assuming 9 features for IMU
+        'input_shape_emg': (num_emg_channels, 4),
+        'input_shape_imu': 9,
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -415,8 +412,6 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
     # Create data loaders
     model, train_loss, train_accuracy, criterion = train_and_log(train_config=train_config, model_config=config, training_dataset=training_dataset, model=model, wandb_enabled=False, multiclass=False, wandb_project=None)
     # Evaluate the model on validation set
-    #val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=validation_dataset, model=model, criterion=criterion, multiclass=False, wandb_project=None)
-    #print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}")
     validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
     val_loss, val_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = evaluate_lstm(model, validation_loader, criterion)
     plot_confusion_matrix(y_true, y_pred)
@@ -443,8 +438,8 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 32],
         'hidden_sizes_imu': [128, 64, 32],
-        'input_shape_emg': num_emg_channels*4,  # Assuming 11 time steps and 4 features for EMG
-        'input_shape_imu': 18,  # Assuming 9 features for IMU
+        'input_shape_emg': num_emg_channels*4,
+        'input_shape_imu': 18,
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -501,7 +496,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     config = {
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 128, 64],
-        'input_shape_emg': (num_emg_channels, 4),  # Assuming 11 time steps and 4 features for EMG
+        'input_shape_emg': (num_emg_channels, 4),
         'dropout_rate': 0.1
     }
     # Initialize the model
@@ -543,13 +538,14 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     np.savez(file_path, **data_dict)
     return model
 
-#%%
+#%% Code for testing the pipelines on saved data
 
 folder_name = "after1"
 recording_number = "0"
-file_path_angles = "//wsl.localhost/Ubuntu/home/dema/CBPR_Recording_Folders/"+folder_name+"/DATASET_ANGLE_ESTIMATION_"+recording_number+"/angles_estimation_dataset.npz"
-file_path_raw_imu = "//wsl.localhost/Ubuntu/home/dema/CBPR_Recording_Folders/"+folder_name+"/DATASET_RAW_IMU_"+recording_number+"/raw_imu_dataset.npz"
-file_path_emg = "//wsl.localhost/Ubuntu/home/dema/CBPR_Recording_Folders/"+folder_name+"/DATASET_EMG_"+recording_number+"/emg_dataset.npz"
+base_linux_path = "//wsl.localhost/Ubuntu/home/dema/CBPR_Recording_Folders/"
+file_path_angles = base_linux_path + folder_name + "/DATASET_ANGLE_ESTIMATION_" + recording_number + "/angles_estimation_dataset.npz"
+file_path_raw_imu = base_linux_path + folder_name + "/DATASET_RAW_IMU_" + recording_number + "/raw_imu_dataset.npz"
+file_path_emg = base_linux_path + folder_name + "/DATASET_EMG_" + recording_number + "/emg_dataset.npz"
 # load the storage of each input type models (the order is ffnn, lstm, cnn)
 #file_path_angles = "C:/Users/claud/Desktop/angles_estimation_dataset.npz"
 #file_path_raw_imu = "C:/Users/claud/Desktop/raw_imu_dataset.npz"
@@ -574,12 +570,22 @@ model_raw_imu_from_online_lstm = pipeline_raw_IMU_lstm_from_online(emg_raw_imu, 
 emg_emg, imu_emg, label_emg = undersample_majority_class_first_n(emg_data=emg_emg, imu_data=imu_emg, labels=label_emg)
 model_emg_from_online_lstm = pipeline_EMG_lstm_from_online(emg_emg, imu_emg, label_emg, num_classes=5, model_path=BASE_MODEL_PATH+'/models/model_lstm_emg.pth')
 
-#%% count memory
+
+#%% SAVE MODELS
+
+model_path_lstm = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm.pth'
+model_path_lstm_raw_imu = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm_raw_imu.pth'
+model_path_lstm_emg = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm_emg.pth'
+torch.save(model_angles_from_online_lstm.state_dict(), model_path_lstm)
+torch.save(model_raw_imu_from_online_lstm.state_dict(), model_path_lstm_raw_imu)
+torch.save(model_emg_from_online_lstm.state_dict(), model_path_lstm_emg)
+
+#%% COUNT PARAMETERS
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(count_parameters(model)*4/1024)
-#%%
+#print(count_parameters(model)*4/1024)
+#%% FROM HERE TESTS USEFUL FOR MANAGING AND PROCESSING DATA
 
 recording_numbers = ["0", "1", "2", "3", "4", "5"]
 recording_days = ["day2_1", "day3_1"]
@@ -624,7 +630,7 @@ for key, value in data.items():
     else:
         print(f"{key}: No data")
 
-# delete the first and the 7th emg channel in each emg dataset
+# delete the first and the 7th emg channel in each emg dataset, because going from 11 to 9 EMG sensors
 data['emg_angles'] = np.delete(data['emg_angles'], [0, 6], axis=1)
 data['emg_raw_imu'] = np.delete(data['emg_raw_imu'], [0, 6], axis=1)
 data['emg_emg'] = np.delete(data['emg_emg'], [0, 6], axis=1)
@@ -664,13 +670,4 @@ for participant_folder in participant_folders:
     raw_imu_model = pipeline_raw_IMU_lstm_from_online(data['emg_raw_imu'], data['imu_raw_imu'], data['label_raw_imu'], num_classes=5, model_path=None, save=False, model_path_save = "model_ffnn_raw_imu.pth", participant_folder=participant_folder)
     emg_model = pipeline_EMG_lstm_from_online(data['emg_emg'], data['label_emg'], num_classes=5, model_path=None, save=False, model_path_save = "model_ffnn_emg.pth", participant_folder=participant_folder)
 
-
-#%%
-
-model_path_lstm = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm.pth'
-model_path_lstm_raw_imu = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm_raw_imu.pth'
-model_path_lstm_emg = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_lstm_emg.pth'
-torch.save(model_angles_from_online_lstm.state_dict(), model_path_lstm)
-torch.save(model_raw_imu_from_online_lstm.state_dict(), model_path_lstm_raw_imu)
-torch.save(model_emg_from_online_lstm.state_dict(), model_path_lstm_emg)
 # %%

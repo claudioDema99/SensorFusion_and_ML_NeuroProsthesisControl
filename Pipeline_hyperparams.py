@@ -56,7 +56,6 @@ def read(data_dir, name):
     x, y = torch.load(os.path.join(data_dir, filename))
     return x, y
 
-# LOAD AND LOG
 '''
 It loads the data and the labels from the locally saved numpy files.
 If wandb_enabled is True, the function will log the raw data to W&B. 
@@ -101,7 +100,6 @@ def load(no_weight_classification, name_dataset, name_labels):
         label[i] = label[i] - 1
     return data, label
 
-# PREPROCESS AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "raw-data" artifact 
 and preprocess it.
@@ -177,12 +175,10 @@ def train_val_dataset_and_log(wandb_enabled=False, windows=None, labels=None, mu
 def train_multi(model, train_loader, criterion, optimizer, num_epochs, patience=64):
     model.train()
     early_stopping = EarlyStopping(patience=patience, verbose=True)
-
     for epoch in range(num_epochs):
         running_loss = 0.0
         correct = 0
         total = 0
-
         # Training phase
         for emg, imu, label in train_loader:
             optimizer.zero_grad()
@@ -190,33 +186,25 @@ def train_multi(model, train_loader, criterion, optimizer, num_epochs, patience=
             loss = criterion(outputs, label)
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
             labels_idx = torch.argmax(label, dim=1)
             _, predicted = torch.max(outputs, 1)
             total += label.size(0)
             correct += (predicted == labels_idx).sum().item()
-
         train_loss = running_loss / total
         train_accuracy = correct / total
-
         # Validation phase
         #val_loss, val_accuracy = evaluate(model, val_loader, criterion)
-
         # Log metrics using wandb
         wandb.log({"Epoch": epoch, "Train Loss": train_loss, "Train Accuracy": train_accuracy,})
 #                   "Validation Loss": val_loss, "Validation Accuracy": val_accuracy
-
         print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, ")
 #              f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
-
         # Early stopping check
         early_stopping(train_loss, model)
-
         if early_stopping.early_stop:
             print(f"Early stopping at epoch {epoch+1}")
             break
-
     # Load the best model before returning
     model.load_state_dict(early_stopping.best_model_wts)
     return train_loss, train_accuracy
@@ -226,7 +214,6 @@ def evaluate(model, val_loader, criterion):
     running_loss = 0.0
     correct = 0
     total = 0
-
     with torch.no_grad():
         for emg, imu, label in val_loader:
             outputs = model(emg, imu)
@@ -236,7 +223,6 @@ def evaluate(model, val_loader, criterion):
             _, predicted = torch.max(outputs, 1)
             total += label.size(0)
             correct += (predicted == labels_idx).sum().item()
-
     val_loss = running_loss / total
     val_accuracy = correct / total
     return val_loss, val_accuracy
@@ -247,7 +233,6 @@ def test_multi(model, test_loader):
     total = 0
     y_true = []
     y_pred = []
-    
     with torch.no_grad():
         for emg, imu, label in test_loader:
             outputs = model(emg, imu)
@@ -257,16 +242,13 @@ def test_multi(model, test_loader):
             correct += (predicted == labels_idx).sum().item()
             #y_true.extend(labels_idx.cpu().numpy())
             #y_pred.extend(predicted.cpu().numpy())
-    
     test_accuracy = correct / total
-    
     # Log test accuracy
     wandb.log({"Test Accuracy": test_accuracy})
-    
     print(f"Test Accuracy: {test_accuracy:.4f}")
     return test_accuracy#, y_true, y_pred
 
-#%% HYPERPARAMETER TUNING
+#%% HYPERPARAMETER TUNING WITH WANDB
 
 dataset_name='prova_senza5_dataset.npy'
 label_name='prova_senza5_labels.npy'
@@ -274,8 +256,6 @@ num_classes=6
 data, label = load_and_log(dataset_name, label_name, no_weight_classification=False, wandb_enabled=False, wandb_project="tuning_test")
 windows, label = preprocess_and_log(num_classes=num_classes, data=data, label=label)
 train_data, val_data = train_val_dataset_and_log(windows=windows, labels=label, wandb_enabled=False, wandb_project="tuning_test")
-
-#%%
 
 sweep_config = {
     'method': 'random',
@@ -330,7 +310,6 @@ def train_hyperparameter_tuning(config=None):
         # Optimizer
         optimizer = build_optimizer(model, config.optimizer, config.learning_rate, config.weight_decay)
         # Call train_multi with early stopping
-        #train_loss, train_accuracy = train_multiclass(model, train_loader, criterion, optimizer, config.epochs)#, scheduler)
         train_loss, train_accuracy = train_multi(model, train_loader, criterion, optimizer, config.epochs, patience=64)
         wandb.log({"Final Training Loss": train_loss, "Final Training Accuracy": train_accuracy})
         test_accuracy = test_multi(model, validation_loader)
@@ -398,7 +377,6 @@ emg_train, emg_val, labels_train, labels_val = train_test_split(emg_tensor, labe
 train_data = TensorDataset(emg_train, labels_train) 
 val_data = TensorDataset(emg_val, labels_val)
 
-
 sweep_config = {
     'method': 'random',
     'metric': {'name': 'Test Accuracy', 
@@ -462,12 +440,11 @@ def train_hyperparameter_tuning(config=None):
         # optimizer
         criterion = nn.CrossEntropyLoss()
         optimizer = build_optimizer(model, config.optimizer, config.learning_rate)
-        train_accuracy, train_loss = train_multi_EMG(model, train_loader, criterion, optimizer, config.epochs)
+        train_accuracy, train_loss = train_EMG(model, train_loader, criterion, optimizer, config.epochs)
         wandb.log({"Loss": {train_loss}, "Accuracy": {train_accuracy}})
         validation_loader = DataLoader(val_data, batch_size=128)
-        test_accuracy = test_multi_EMG(model, validation_loader)
+        test_accuracy = test_EMG(model, validation_loader)
         wandb.log({"Test Accuracy": test_accuracy})
-
 
 def build_optimizer(network, optimizer, learning_rate):
     if optimizer == "sgd":

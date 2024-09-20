@@ -99,7 +99,7 @@ def extract_angles_from_rot_matrix(rotation_matrices, num_windows_same_movement,
     angular_pose = correct_euler_angles(angular_pose)
     angles = np.zeros((num_windows, 9)) # config.input_shape_imu
     for m in range(num_windows):
-        angles[m, 0] = angular_pose[m, 2, 2]  # shoulder abduction 
+        angles[m, 0] = angular_pose[m, 2, 2]  # represent shoulder abduction 
         angles[m, 1] = angular_pose[m, 2, 0]  # shoulder flexion
         angles[m, 2] = angular_pose[m, 2, 1]  # shoulder rotation
         angles[m, 3] = angular_pose[m, 1, 0] - angular_pose[m, 2, 0]  # elbow

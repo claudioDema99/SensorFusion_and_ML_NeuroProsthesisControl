@@ -673,8 +673,6 @@ def train_multiclass(model, train_loader, criterion, optimizer, epochs):
         correct = 0
         total = 0
         exact_matches = 0
-        #exact_matches_2 = 0
-        #i=0
         for emg, imu, label in train_loader:
             optimizer.zero_grad()
             outputs = model(emg, imu)
@@ -685,22 +683,11 @@ def train_multiclass(model, train_loader, criterion, optimizer, epochs):
             labels_idx = torch.argmax(label, dim=label.dim()-1)
             _, predicted = torch.max(outputs, 1)
             total += label.size(0)
-            # label.T for multiclass classification problem
             correct += (predicted == labels_idx).sum().item()
-            #exact_matches += (predicted == labels_idx).all().item()
             exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
-            #exact_matches_2 += (predicted == labels_idx).all(dim=1).sum().item()
-            #print(f"Predicted: {predicted}")
-            #print(f"Labels: {labels_idx}")
-            #if i % 10 == 0:
-                #print(f"\nPredicted: {predicted}\nType: {type(predicted)}\nLabels: {labels_idx}\nType: {type(labels_idx)}\n")
-            #i += 1
         train_loss = running_loss / len(train_loader)
         train_accuracy = correct / total
         emr = exact_matches / len(train_loader)
-        #scheduler.step()
-        #print(f" lr: {}")
-        #print(f"Exact new matches: {exact_matches_2}")
         print(f"Epoch {epoch+1}/{epochs}, EMR: {emr}")
         print(f"Epoch {epoch+1}/{epochs}, Loss: {train_loss}, Accuracy: {train_accuracy}")
     return train_loss, train_accuracy
@@ -784,7 +771,6 @@ def test_multi_and_log(model, test_loader):
     wandb.log({"test_accuracy": test_accuracy})
 
 def get_tensor_dataset(emg, imu, labels, raw_imu=False):
-    # TEST SIZE 0.4 (MODIFIED)
     emg_data = np.array(emg)
     imu_data = np.array(imu)
     label_data = np.array(labels)
@@ -804,7 +790,7 @@ def get_tensor_dataset(emg, imu, labels, raw_imu=False):
     print(imu_tensor.size())
     print(label_tensor.size())
     # Split the data into training and validation sets
-    emg_train, emg_val, imu_train, imu_val, labels_train, labels_val = train_test_split(emg_tensor, imu_tensor, label_tensor, test_size=0.4, random_state=42)
+    emg_train, emg_val, imu_train, imu_val, labels_train, labels_val = train_test_split(emg_tensor, imu_tensor, label_tensor, test_size=0.2, random_state=42)
     return TensorDataset(emg_train, imu_train, labels_train), TensorDataset(emg_val, imu_val, labels_val)
 
 #%% EMG network

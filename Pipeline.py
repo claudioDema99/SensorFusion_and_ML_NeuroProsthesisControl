@@ -57,7 +57,6 @@ def read(data_dir, name):
     x, y = torch.load(os.path.join(data_dir, filename))
     return x, y
 
-# LOAD AND LOG
 '''
 It loads the data and the labels from the locally saved numpy files.
 If wandb_enabled is True, the function will log the raw data to W&B. 
@@ -102,7 +101,6 @@ def load(no_weight_classification, name_dataset, name_labels):
         label[i] = label[i] - 1
     return data, label
 
-# PREPROCESS AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "raw-data" artifact 
 and preprocess it.
@@ -144,7 +142,6 @@ def preprocess_and_window(data, label, window_length, overlap, num_classes):
     label = label.reshape(-1, num_classes)
     return windows, label
 
-# BUILD MODEL AND LOG
 '''
 If wandb_enabled is True, the function will log the model to W&B.
 In any case, it will return the model.
@@ -167,7 +164,6 @@ def build_model_and_log(config, wandb_enabled=False, wandb_project=None):
         model = MyMultimodalNetwork(input_shape_emg=config['input_shape_emg'], input_shape_imu=config['input_shape_imu'], num_classes=config['num_classes'], hidden_sizes_emg=config['hidden_sizes_emg'], hidden_sizes_imu=config['hidden_sizes_imu'], dropout_rate=0.1)
     return model
 
-# TRAIN VAL DATASET AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "raw-data" artifact, preprocess it, 
 and create the training and validation datasets.
@@ -215,7 +211,6 @@ def train_val_dataset_raw_imu(windows, labels):
     training_dataset, validation_dataset = get_tensor_dataset(emg_vector, imu_vector, labels)
     return training_dataset, validation_dataset
 
-# TRAIN AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "train-val-dataset" artifact, and the latest artifact from the "network" artifact.
 If wandb_enabled is True, we log the trained model to W&B.
@@ -267,7 +262,6 @@ def train_and_log(train_config, model_config, training_dataset=None, model=None,
             run.log_artifact(model_artifact)
     return model
 
-# EVALUATE AND LOG
 '''
 If we don't pass any data, the function will download the latest artifact from the "train-val-dataset" artifact, and the latest artifact from the "trained-network" artifact.
 '''
@@ -410,8 +404,8 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
     training_dataset, validation_dataset = get_tensor_dataset(emg, imu.squeeze(), label.squeeze())
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [256, 256, 256],#[512, 2048, 2048, 2048, 2048, 2048, 512],
-        'hidden_sizes_imu': [256, 256, 256],#[512, 2048, 2048, 2048, 2048, 2048, 512],
+        'hidden_sizes_emg': [256, 256, 256],
+        'hidden_sizes_imu': [256, 256, 256],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 9, #9
         'dropout_rate': 0.1
@@ -451,8 +445,8 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
     training_dataset, validation_dataset = get_tensor_dataset(emg, imu.squeeze(), label.squeeze())
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [256, 256, 256],#[512, 2048, 2048, 2048, 2048, 2048, 512],
-        'hidden_sizes_imu': [256, 256, 256],#[512, 2048, 2048, 2048, 2048, 2048, 512],
+        'hidden_sizes_emg': [256, 256, 256],
+        'hidden_sizes_imu': [256, 256, 256],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 18, #9
         'dropout_rate': 0.1
@@ -570,7 +564,7 @@ def pipeline_inference_and_storing(emg, label, model_path, imu=None, save=False)
         torch.save(model, model_path)
     return all_predictions
 
-#%%
+#%% Code for testing the pipelines on saved data
 
 base_path = "//wsl.localhost/Ubuntu/home/dema/CBPR_Recording_Folders/"
 recording_numbers = ["0", "1", "2", "3", "4", "5"]
@@ -616,7 +610,7 @@ for key, value in data.items():
     else:
         print(f"{key}: No data")
 
-# delete the first and the 7th emg channel in each emg dataset
+# delete the first and the 7th emg channel in each emg dataset, because going from 11 to 9 EMG sensors
 data['emg_angles'] = np.delete(data['emg_angles'], [0, 6], axis=1)
 data['emg_raw_imu'] = np.delete(data['emg_raw_imu'], [0, 6], axis=1)
 data['emg_emg'] = np.delete(data['emg_emg'], [0, 6], axis=1)
@@ -638,8 +632,24 @@ model_raw_imu_from_online_ffnn = pipeline_raw_IMU_from_online(data['emg_raw_imu'
 data['emg_emg'], _, data['label_emg'] = undersample_majority_class_first_n(emg_data=data['emg_emg'], labels=data['label_emg'])
 model_emg_from_online_ffnn = pipeline_EMG_from_online(data['emg_emg'], data['label_emg'], num_classes=5, model_path=None, save=True, model_path_save = "models/model_ffnn_emg9.pth")
 
+#%% SAVE/LOAD THE MODEL
 
-#%% INFERENCE AND STORE
+model_path_ffnn = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn.pth'
+model_path_ffnn_raw_imu = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn_raw_imu.pth'
+model_path_ffnn_emg = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn_emg.pth'
+torch.save(model_angles_from_online_ffnn.state_dict(), model_path_ffnn)
+torch.save(model_raw_imu_from_online_ffnn.state_dict(), model_path_ffnn_raw_imu)
+torch.save(model_emg_from_online_ffnn.state_dict(), model_path_ffnn_emg)
+#trained_model.load_state_dict(torch.load(model_path))
+
+#%% COUNT PARAMETERS
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+#print(count_parameters(model)*4/1024)
+
+
+#%% FROM HERE TESTS USEFUL FOR MANAGING AND PROCESSING DATA
 
 folder_name = "day3_1"
 recording_number = "5"
@@ -688,21 +698,5 @@ for participant_folder in participant_folders:
     angles_model = pipeline_from_online(data['emg_angles'], data['imu_angles'], data['label_angles'], num_classes=5, model_path=None, save=False, model_path_save = "models/model_ffnn_angles.pth", participant_folder=participant_folder)
     raw_imu_model = pipeline_raw_IMU_from_online(data['emg_raw_imu'], data['imu_raw_imu'], data['label_raw_imu'], num_classes=5, model_path=None, save=False, model_path_save = "models/model_ffnn_raw_imu.pth", participant_folder=participant_folder)
     emg_model = pipeline_EMG_from_online(data['emg_emg'], data['label_emg'], num_classes=5, model_path=None, save=False, model_path_save = "models/model_ffnn_emg.pth", participant_folder=participant_folder)
-
-#%% SAVE/LOAD THE MODEL
-
-model_path_ffnn = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn.pth'
-model_path_ffnn_raw_imu = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn_raw_imu.pth'
-model_path_ffnn_emg = '//wsl.localhost/Ubuntu/home/dema/ros2_ws/models/model_ffnn_emg.pth'
-torch.save(model_angles_from_online_ffnn.state_dict(), model_path_ffnn)
-torch.save(model_raw_imu_from_online_ffnn.state_dict(), model_path_ffnn_raw_imu)
-torch.save(model_emg_from_online_ffnn.state_dict(), model_path_ffnn_emg)
-#trained_model.load_state_dict(torch.load(model_path))
-
-#%% count memory
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(count_parameters(model)*4/1024)
 
 # %%

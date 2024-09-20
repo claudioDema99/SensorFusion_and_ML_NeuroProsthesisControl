@@ -7,6 +7,8 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 import pandas as pd
 from scipy import signal
+from cbpr_master_thesis.preprocessing_and_normalization import highpass_filter, bandpass_filter, notch_filter, normalize_EMG_all_channels, normalize_raw_imu, convert_to_SI
+from cbpr_master_thesis.feature_extraction import extract_EMG_features, create_windows
 
 #%% NORMALIZATION PARAMS
 
@@ -234,6 +236,7 @@ def undersample_majority_class_first_n(emg_data, imu_data, labels, target_sample
 
 #%% DATA EXTRACTION AND BALANCING
 
+base_path = "C:/Users/claud/Desktop/CBPR_Recording_Folders/"
 def extract_and_balance(participant_folder, recording_numbers):
     data = {'emg_angles': [], 'imu_angles': [], 'label_angles': [], 
             'emg_raw_imu': [], 'imu_raw_imu': [], 'label_raw_imu': [], 
@@ -258,7 +261,7 @@ def extract_and_balance(participant_folder, recording_numbers):
     data['emg_emg'], data['imu_emg'], data['label_emg'] = undersample_majority_class_first_n(data['emg_emg'][0], data['imu_emg'][0], data['label_emg'][0])
     return data
 
-#%% JuliusAI
+#%% Confusion Matrix, Accuracy, Classification Report and F1-scores
 
 # Function to plot confusion matrix
 def plot_confusion_matrix(y_true, y_pred, title=None):
@@ -270,6 +273,7 @@ def plot_confusion_matrix(y_true, y_pred, title=None):
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.show()
+
 # Function to calculate accuracy
 def calculate_accuracy(y_true, y_pred):
     return accuracy_score(y_true, y_pred)
@@ -287,17 +291,13 @@ def data_analysis():
         for dataset in datasets:
             # Construct full path
             full_path = os.path.join(base_path, participant_folder, dataset)
-            
             # Load the dataset
             data = np.load(full_path)
-            
             # Get true labels and predictions
             y_true = data['label']
             y_pred = data['prediction']
-            
             # Extract model and data type from dataset name
             model, data_type = dataset.split('_')[:2]
-            
             # Plot and save confusion matrix
             cm = confusion_matrix(y_true, y_pred)
             plt.figure(figsize=(10, 8))
@@ -308,16 +308,13 @@ def data_analysis():
             cm_filename = f"{participant_folder[:-1]}_{model}_{data_type}_confusion_matrix.png"
             plt.savefig(os.path.join(base_path, participant_folder, cm_filename))
             plt.close()
-            
             # Calculate and print accuracy
             acc = accuracy_score(y_true, y_pred)
             print(f'{participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()} - Accuracy: {acc:.4f}')
-            
             # Generate and print classification report
             report = classification_report(y_true, y_pred, output_dict=True)
             print(f'{participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()} - Classification Report:')
             print(classification_report(y_true, y_pred))
-            
             # Create and save bar plot of class-wise F1-scores
             class_f1_scores = {f'Class {i}': report[str(i)]['f1-score'] for i in range(len(report)-3)}
             plt.figure(figsize=(10, 6))
@@ -330,7 +327,6 @@ def data_analysis():
             f1_filename = f"{participant_folder[:-1]}_{model}_{data_type}_f1_scores.png"
             plt.savefig(os.path.join(base_path, participant_folder, f1_filename))
             plt.close()
-            
             print(f"Analysis complete for {participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()}")
             print("----------------------------------------")
 # %%

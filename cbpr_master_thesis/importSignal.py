@@ -210,8 +210,6 @@ for file_csv, file_label in zip(csv_files, label_files):
     # Do something with the data and labels
     labels.append(label[0,:])
     dataset.append(extract_and_store_classes(data, label[1, :]))
-#print(len(dataset))
-#print(len(labels))
 for i in range(len(dataset)):
     print(np.array(dataset[i]).shape)
     print(np.array(labels[i]).shape)
