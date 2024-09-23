@@ -780,15 +780,16 @@ def train_multiclass(model, train_loader, criterion, optimizer, epochs):
         for emg, imu, label in train_loader:
             optimizer.zero_grad()
             outputs = model(emg, imu)
+            label = label.float()
             loss = criterion(outputs, label)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
             labels_idx = torch.argmax(label, dim=label.dim()-1)
             _, predicted = torch.max(outputs, 1)
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
-            exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
+            exact_matches += (predicted == labels_idx).all(dim=0).sum().item()
         train_loss = running_loss / len(train_loader)
         train_accuracy = correct / total
         emr = exact_matches / len(train_loader)
@@ -842,6 +843,7 @@ def test_and_storing(model, test_loader):
     with torch.no_grad():
         for emg, imu, label in test_loader:
             outputs = model(emg, imu)
+            label = label.float()
             labels_idx = torch.argmax(label, dim=label.dim()-1)
             _, predicted = torch.max(outputs, 1)
             # for storing all predictions and inputs
@@ -854,7 +856,7 @@ def test_and_storing(model, test_loader):
             else:
                 labels_data.append(labels_idx.cpu().numpy())
                 y_true.append(labels_idx.cpu().numpy())
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     test_accuracy = correct / total
@@ -947,6 +949,7 @@ def train_EMG(model, train_loader, criterion, optimizer, epochs, multiclass=Fals
         for emg, label in train_loader:
             optimizer.zero_grad()
             outputs = model(emg)
+            label = label.float()
             loss = criterion(outputs, label)
             loss.backward()
             optimizer.step()
@@ -956,7 +959,7 @@ def train_EMG(model, train_loader, criterion, optimizer, epochs, multiclass=Fals
             if multiclass:
                 labels_idx = torch.argmax(label, dim=label.dim()-1)
                 correct += (predicted == labels_idx).sum().item()
-                exact_matches += (predicted == labels_idx).all().item()
+                exact_matches += (predicted == labels_idx).all(dim=0).sum().item()
             else:
                 correct += (predicted == label).sum().item()
         train_loss = running_loss / len(train_loader)

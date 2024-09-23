@@ -424,7 +424,7 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
     #test_accuracy, y_true, y_pred, all_predictions = evaluate_and_log(train_config, validation_dataset, trained_model, wandb_project="SL_multiclass")
     validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
     test_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = test_and_storing(model, validation_loader)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     if save:
         model_path = model_path_save
         torch.save(trained_model, model_path)
@@ -437,7 +437,8 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT FOR SAVE THE DATA
+    #np.savez(file_path, **data_dict)
     return trained_model
 
 def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -465,7 +466,7 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
     # Evaluate the model on validation set
     validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
     test_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = test_and_storing(model, validation_loader)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     if save:
         model_path = model_path_save
         torch.save(trained_model, model_path)
@@ -478,7 +479,8 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT FOR SAVE THE DATA
+    #np.savez(file_path, **data_dict)
     return model
 
 def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -514,7 +516,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
     train_accuracy, train_loss = train_EMG(model, train_loader, criterion, optimizer, train_config_EMG['epochs'], multiclass=True)
     validation_loader = DataLoader(val_data, batch_size=128)
     test_accuracy, y_true, y_pred, emg_data, label_data, predictions = test_EMG_and_storing(model, validation_loader, multiclass=True)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     if save:
         model_path = model_path_save
@@ -528,7 +530,8 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT FOR SAVE THE DATA
+    #np.savez(file_path, **data_dict)
     return model
 
 def pipeline_inference_and_storing(emg, label, model_path, imu=None, save=False):
