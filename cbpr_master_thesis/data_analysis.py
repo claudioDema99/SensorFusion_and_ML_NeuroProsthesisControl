@@ -7,6 +7,7 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 import pandas as pd
 from scipy import signal
+import pickle
 from cbpr_master_thesis.preprocessing_and_normalization import highpass_filter, bandpass_filter, notch_filter, normalize_EMG_all_channels, normalize_raw_imu, convert_to_SI
 from cbpr_master_thesis.feature_extraction import extract_EMG_features, create_windows
 
@@ -263,21 +264,6 @@ def extract_and_balance(participant_folder, recording_numbers):
 
 #%% Confusion Matrix, Accuracy, Classification Report and F1-scores
 
-# Function to plot confusion matrix
-def plot_confusion_matrix(y_true, y_pred, title=None):
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    if title is not None:
-        plt.title(title)
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.show()
-
-# Function to calculate accuracy
-def calculate_accuracy(y_true, y_pred):
-    return accuracy_score(y_true, y_pred)
-
 def data_analysis():
     base_path = "C:/Users/claud/Desktop/CBPR_Recordings/"
     datasets = ["ffnn_angles_dataset.npz", "lstm_angles_dataset.npz", "cnn_angles_dataset.npz", 
@@ -287,19 +273,35 @@ def data_analysis():
                            "1_02_09/", "2_02_09/", "1_04_09/", "2_04_09/", "3_04_09/", "1_05_09/", 
                            "2_05_09/", "3_05_09/", "1_06_09/"]
 
+    # Dictionary to store metrics
+    metrics_dict = {
+        'Participant': [],
+        'Model': [],
+        'Data_Type': [],
+        'Accuracy': [],
+        'Precision': [],
+        'Recall': [],
+        'F1-Score': []
+    }
+
+    # Dictionary to store confusion matrices
+    confusion_matrices = {}
+
     for participant_folder in participant_folders:
         for dataset in datasets:
             # Construct full path
             full_path = os.path.join(base_path, participant_folder, dataset)
             # Load the dataset
             data = np.load(full_path)
-            # Get true labels and predictions
             y_true = data['label']
             y_pred = data['prediction']
-            # Extract model and data type from dataset name
             model, data_type = dataset.split('_')[:2]
-            # Plot and save confusion matrix
+
+            # Confusion matrix
             cm = confusion_matrix(y_true, y_pred)
+            confusion_matrices[f'{participant_folder[:-1]}_{model}_{data_type}'] = cm
+
+            # Plot confusion matrix
             plt.figure(figsize=(10, 8))
             sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
             plt.title(f'{model.upper()} - {data_type.capitalize()} - Confusion Matrix')
@@ -308,15 +310,26 @@ def data_analysis():
             cm_filename = f"{participant_folder[:-1]}_{model}_{data_type}_confusion_matrix.png"
             plt.savefig(os.path.join(base_path, participant_folder, cm_filename))
             plt.close()
-            # Calculate and print accuracy
+
+            # Accuracy and classification report
             acc = accuracy_score(y_true, y_pred)
-            print(f'{participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()} - Accuracy: {acc:.4f}')
-            # Generate and print classification report
             report = classification_report(y_true, y_pred, output_dict=True)
+
+            # Store metrics
+            metrics_dict['Participant'].append(participant_folder[:-1])
+            metrics_dict['Model'].append(model.upper())
+            metrics_dict['Data_Type'].append(data_type.capitalize())
+            metrics_dict['Accuracy'].append(acc)
+            metrics_dict['Precision'].append(report['weighted avg']['precision'])
+            metrics_dict['Recall'].append(report['weighted avg']['recall'])
+            metrics_dict['F1-Score'].append(report['weighted avg']['f1-score'])
+
+            # Print the report for reference
             print(f'{participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()} - Classification Report:')
             print(classification_report(y_true, y_pred))
-            # Create and save bar plot of class-wise F1-scores
-            class_f1_scores = {f'Class {i}': report[str(i)]['f1-score'] for i in range(len(report)-3)}
+
+            # Plot F1-scores
+            class_f1_scores = {f'Class {i}': report[str(i)]['f1-score'] for i in range(len(report) - 3)}
             plt.figure(figsize=(10, 6))
             plt.bar(class_f1_scores.keys(), class_f1_scores.values())
             plt.title(f'{model.upper()} - {data_type.capitalize()} - F1-scores for each class')
@@ -327,6 +340,92 @@ def data_analysis():
             f1_filename = f"{participant_folder[:-1]}_{model}_{data_type}_f1_scores.png"
             plt.savefig(os.path.join(base_path, participant_folder, f1_filename))
             plt.close()
+
             print(f"Analysis complete for {participant_folder[:-1]} - {model.upper()} - {data_type.capitalize()}")
             print("----------------------------------------")
-# %%
+
+    # Convert metrics dictionary to DataFrame for easier manipulation
+    metrics_df = pd.DataFrame(metrics_dict)
+    # Save metrics DataFrame to CSV or Excel
+    metrics_df.to_csv("metrics.csv", index=False)
+    # or: metrics_df.to_excel("metrics.xlsx", index=False)
+    # Save confusion matrices dictionary using pickle
+    with open("confusion_matrices.pkl", "wb") as f:
+        pickle.dump(confusion_matrices, f)
+    return metrics_df, confusion_matrices
+
+'''
+# Load CSV
+metrics_df = pd.read_csv("metrics.csv")
+
+# Load Excel
+metrics_df = pd.read_excel("metrics.xlsx")
+with open("confusion_matrices.pkl", "rb") as f:
+    confusion_matrices = pickle.load(f)
+'''
+
+# %% PLOTS FROM DATA ANALYSIS
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def plot_accuracy_boxplots(metrics_df, model_type):
+    # Filter data for the specified model type (FFNN, CNN, LSTM)
+    filtered_df = metrics_df[metrics_df['Model'] == model_type]
+    
+    # Create boxplot for accuracy across different input types (EMG, Angles, IMU)
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='Data_Type', y='Accuracy', data=filtered_df)
+    plt.title(f'Accuracy Distribution for {model_type}')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Input Type')
+    plt.show()
+
+def plot_performance_lineplot(metrics_df, model_type):
+    # Filter data for the specified model type
+    filtered_df = metrics_df[metrics_df['Model'] == model_type]
+
+    # Create a line plot for each metric (Accuracy, Precision, Recall, F1-Score)
+    plt.figure(figsize=(12, 6))
+    
+    for metric in ['Accuracy', 'Precision', 'Recall', 'F1-Score']:
+        sns.lineplot(x='Data_Type', y=metric, data=filtered_df, label=metric)
+    
+    plt.title(f'Performance Across Input Types for {model_type}')
+    plt.ylabel('Metric Value')
+    plt.xlabel('Input Type')
+    plt.legend(title='Metrics')
+    plt.show()
+
+def plot_f1_scores_barchart(metrics_df, model_type):
+    # Filter data for the specified model type
+    filtered_df = metrics_df[metrics_df['Model'] == model_type]
+    
+    # Create a bar chart showing the F1-scores for each class
+    for input_type in filtered_df['Data_Type'].unique():
+        class_f1_df = filtered_df[filtered_df['Data_Type'] == input_type]
+        
+        # Assuming the class F1-scores are stored as additional columns
+        # Create bar plot for F1-score for each class (e.g., 'Class 0', 'Class 1', etc.)
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x='Class', y='F1-Score', data=class_f1_df)
+        plt.title(f'{model_type} - F1-scores for Each Class ({input_type})')
+        plt.ylabel('F1-Score')
+        plt.ylim(0, 1)
+        plt.xlabel('Class')
+        plt.show()
+
+'''
+# Example usage for FFNN, CNN, and LSTM
+plot_accuracy_boxplots(metrics_df, 'FFNN')
+plot_accuracy_boxplots(metrics_df, 'CNN')
+plot_accuracy_boxplots(metrics_df, 'LSTM')
+# Example usage for FFNN, CNN, and LSTM
+plot_performance_lineplot(metrics_df, 'FFNN')
+plot_performance_lineplot(metrics_df, 'CNN')
+plot_performance_lineplot(metrics_df, 'LSTM')
+# Example usage for FFNN, CNN, and LSTM
+plot_f1_scores_barchart(metrics_df, 'FFNN')
+plot_f1_scores_barchart(metrics_df, 'CNN')
+plot_f1_scores_barchart(metrics_df, 'LSTM')
+'''

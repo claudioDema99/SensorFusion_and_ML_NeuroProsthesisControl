@@ -661,11 +661,6 @@ number_rec_per_input_type = 2
 participant_folders = ["1_30_08", "2_30_08", "3_30_08", "1_31_08", "2_31_08", "3_31_08", "1_02_09", "2_02_09", "1_04_09", "2_04_09", "3_04_09", "1_05_09", "2_05_09", "3_05_09", "1_06_09"]
 
 for participant_folder in participant_folders:
-    print()
-    print()
-    print(f"Processing participant {participant_folder}")
-    print()
-    print()
     data = {'emg_angles': [], 'imu_angles': [], 'label_angles': [], 
             'emg_raw_imu': [], 'imu_raw_imu': [], 'label_raw_imu': [], 
             'emg_emg': [], 'imu_emg': [], 'label_emg': []}
