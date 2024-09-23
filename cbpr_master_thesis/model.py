@@ -205,6 +205,7 @@ def evaluate_lstm(model, val_loader, criterion):
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
+    print(f"Test Loss: {val_loss}, Test Accuracy: {val_accuracy}")
     return val_loss, val_accuracy, y_true, y_pred, np.array(emg_data), np.array(imu_data), np.array(labels_data), np.array(prediction)
 
 def inference_lstm(model, emg_input, imu_input):
@@ -363,6 +364,7 @@ def evaluate_EMG_lstm(model, val_loader, criterion):
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
+    print(f"Test Loss: {val_loss}, Test Accuracy: {val_accuracy}")
     return val_loss, val_accuracy, y_true, y_pred, np.array(emg_data), np.array(labels_data), np.array(prediction)
 
 def inference_EMG_lstm(model, emg_input):
@@ -375,10 +377,10 @@ def inference_EMG_lstm(model, emg_input):
 #%% CNN network
 
 class MyMultimodalNetworkCNN(nn.Module):
-    def __init__(self, input_shape_emg, input_shape_imu, num_classes, hidden_sizes_emg, hidden_sizes_imu, dropout_rate, raw_imu=None):
+    def __init__(self, input_shape_emg, input_shape_imu, num_classes, hidden_sizes_emg, hidden_sizes_imu, dropout_rate):
         super(MyMultimodalNetworkCNN, self).__init__()
-        self.emg_input_shape = input_shape_emg
-        self.imu_input_shape = input_shape_imu
+        self.emg_input_shape = input_shape_emg  # (9, 4)
+        self.imu_input_shape = input_shape_imu  # 9 or 18
         self.num_classes = num_classes
         self.hidden_sizes_emg = hidden_sizes_emg
         self.hidden_sizes_imu = hidden_sizes_imu
@@ -386,49 +388,51 @@ class MyMultimodalNetworkCNN(nn.Module):
 
         # EMG pathway using CNN
         self.emg_conv_layers = nn.ModuleList()
-        self.emg_pool = nn.MaxPool1d(kernel_size=2)
-        emg_input_channels = 1  # Since EMG input is (batch, 11, 4), treat it as 1-channel signal
-        if raw_imu == True:
-            emg_output_size = self.emg_input_shape
-        else:
-            emg_output_size = self.emg_input_shape[0] * self.emg_input_shape[1]
+        self.emg_pool = nn.MaxPool1d(kernel_size=2, stride=1)
+        emg_input_channels = self.emg_input_shape[0]  # 9 EMG channels
+        emg_output_size = self.emg_input_shape[1]  # 4 features per channel
         for emg_hidden_size in self.hidden_sizes_emg:
             self.emg_conv_layers.append(nn.Conv1d(emg_input_channels, emg_hidden_size, kernel_size=3, padding=1))
             emg_input_channels = emg_hidden_size
-            emg_output_size = emg_output_size // 2  # Assuming MaxPooling reduces by half each time
+            # Update output size after convolution, but with careful pooling
+            emg_output_size = max(emg_output_size - 2 + 1, 1)  # Ensures size doesn't drop below 1
+            if emg_output_size > 1:
+                emg_output_size = emg_output_size // 2  # Pooling reduces by half
 
         # IMU pathway using CNN
         self.imu_conv_layers = nn.ModuleList()
-        self.imu_pool = nn.MaxPool1d(kernel_size=2)
-        imu_input_channels = 1  # Since IMU input is (batch, 1, 9), treat it as 1-channel signal
-        imu_output_size = self.imu_input_shape
+        self.imu_pool = nn.MaxPool1d(kernel_size=2, stride = 1)
+        imu_input_channels = 1  # Treat IMU as 1 channel
+        imu_output_size = self.imu_input_shape  # 9 IMU features
         for imu_hidden_size in self.hidden_sizes_imu:
             self.imu_conv_layers.append(nn.Conv1d(imu_input_channels, imu_hidden_size, kernel_size=3, padding=1))
             imu_input_channels = imu_hidden_size
-            imu_output_size = imu_output_size // 2  # Assuming MaxPooling reduces by half each time
+            imu_output_size = max(imu_output_size - 2 + 1, 1)
+            if imu_output_size > 1:
+                imu_output_size = imu_output_size // 2
+        # Flattened Size Calculation
+        emg_flattened_size = self.hidden_sizes_emg[-1] * emg_output_size  # Flattened size from EMG CNN path
+        imu_flattened_size = self.hidden_sizes_imu[-1] * imu_output_size  # Flattened size from IMU CNN path
 
         # Fully connected layer for concatenation
-        fc_input_size = (emg_output_size + imu_output_size) * self.hidden_sizes_emg[-1]
+        fc_input_size = emg_flattened_size + (imu_flattened_size * (self.imu_input_shape - 3))  # Combine EMG and IMU flattened sizes
         self.fc_concat = nn.Linear(fc_input_size, self.num_classes)
         self.dropout = nn.Dropout(dropout_rate)
-        self.softmax = nn.Softmax(dim=1)
-
+        
     def forward(self, emg, imu):
         # EMG pathway
-        emg = emg.unsqueeze(1)  # Add channel dimension: (batch_size, 1, 11, 4)
-        emg = emg.view(emg.size(0), 1, -1)  # Reshape to (batch_size, 1, 44)
+        #emg = emg.transpose(1, 2)  # Change shape to (batch_size, 9 channels, 4 features)
         for emg_conv in self.emg_conv_layers:
-            emg = self.emg_pool(F.relu(emg_conv(emg)))
+            emg = self.emg_pool(F.relu(emg_conv(emg)))  # Apply Conv + Pool
 
         # IMU pathway
         imu = imu.unsqueeze(1)  # Add channel dimension: (batch_size, 1, 9)
-        imu = imu.view(imu.size(0), 1, -1)  # Reshape to (batch_size, 1, 9)
         for imu_conv in self.imu_conv_layers:
-            imu = self.imu_pool(F.relu(imu_conv(imu)))
+            imu = self.imu_pool(F.relu(imu_conv(imu)))  # Apply Conv + Pool
 
         # Flatten outputs
-        emg = emg.view(emg.size(0), -1)
-        imu = imu.view(imu.size(0), -1)
+        emg = emg.view(emg.size(0), -1)  # Flatten the EMG output
+        imu = imu.view(imu.size(0), -1)  # Flatten the IMU output
 
         # Concatenate EMG and IMU outputs
         concat_out = torch.cat((emg, imu), dim=1)
@@ -436,8 +440,6 @@ class MyMultimodalNetworkCNN(nn.Module):
         # Fully connected layer
         output = self.fc_concat(concat_out)
         output = self.dropout(output)
-        # output = self.softmax(output)
-
         return output
 
 def train_cnn(model, train_loader, criterion, optimizer, epochs):
@@ -454,6 +456,8 @@ def train_cnn(model, train_loader, criterion, optimizer, epochs):
             # Forward pass
             outputs = model(emg, imu)
 
+            label =label.float()
+
             # Compute loss
             loss = criterion(outputs, label)
             
@@ -463,15 +467,15 @@ def train_cnn(model, train_loader, criterion, optimizer, epochs):
 
             # Accumulate loss
             running_loss += loss.item()
-
             # Calculate accuracy
             labels_idx = torch.argmax(label, dim=label.dim()-1)
             _, predicted = torch.max(outputs, 1)
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
 
             # Exact match ratio calculation
-            exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
+            exact_matches += (predicted == labels_idx).all(dim=0).sum().item()
+            #exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -497,6 +501,7 @@ def evaluate_cnn(model, val_loader, criterion):
     with torch.no_grad():
         for emg, imu, label in val_loader:
             outputs = model(emg, imu)
+            label = label.float()
             loss = criterion(outputs, label)
             running_loss += loss.item()
             labels_idx = torch.argmax(label, dim=label.dim()-1)
@@ -511,11 +516,12 @@ def evaluate_cnn(model, val_loader, criterion):
             else:
                 labels_data.append(labels_idx.cpu().numpy())
                 y_true.append(labels_idx.cpu().numpy())
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
+    print(f"Test Loss: {val_loss}, Test Accuracy: {val_accuracy}")
     return val_loss, val_accuracy, y_true, y_pred, np.array(emg_data), np.array(imu_data), np.array(labels_data), np.array(prediction)
 
 def inference_cnn(model, emg_input, imu_input):
@@ -535,13 +541,15 @@ class MyNetworkCNN(nn.Module):
 
         # EMG pathway using CNN
         self.emg_conv_layers = nn.ModuleList()
-        self.emg_pool = nn.MaxPool1d(kernel_size=2)
-        emg_input_channels = 1  # Since EMG input is (batch, 11, 4), treat it as 1-channel signal
-        emg_output_size = self.emg_input_shape[0] * self.emg_input_shape[1]
+        self.emg_pool = nn.MaxPool1d(kernel_size=2, stride=1)
+        emg_input_channels = self.emg_input_shape[0]
+        emg_output_size = self.emg_input_shape[1]
         for emg_hidden_size in self.hidden_sizes_emg:
             self.emg_conv_layers.append(nn.Conv1d(emg_input_channels, emg_hidden_size, kernel_size=3, padding=1))
             emg_input_channels = emg_hidden_size
-            emg_output_size = emg_output_size // 2  # Assuming MaxPooling reduces by half each time
+            emg_output_size = max(emg_output_size - 2 + 1, 1)  # Ensures size doesn't drop below 1
+            if emg_output_size > 1:
+                emg_output_size = emg_output_size // 2  # Pooling reduces by half
 
         # Fully connected layer
         fc_input_size = emg_output_size * self.hidden_sizes_emg[-1]
@@ -551,8 +559,6 @@ class MyNetworkCNN(nn.Module):
 
     def forward(self, emg):
         # EMG pathway
-        emg = emg.unsqueeze(1)  # Add channel dimension: (batch_size, 1, 11, 4)
-        emg = emg.view(emg.size(0), 1, -1)  # Reshape to (batch_size, 1, 44)
         for emg_conv in self.emg_conv_layers:
             emg = self.emg_pool(F.relu(emg_conv(emg)))
 
@@ -565,7 +571,7 @@ class MyNetworkCNN(nn.Module):
         # output = self.softmax(output)
 
         return output
-
+    
 def train_EMG_cnn(model, train_loader, criterion, optimizer, epochs):
     model.train()
     for epoch in range(epochs):
@@ -580,6 +586,8 @@ def train_EMG_cnn(model, train_loader, criterion, optimizer, epochs):
             # Forward pass
             outputs = model(emg)
 
+            label = label.float()
+
             # Compute loss
             loss = criterion(outputs, label)
             
@@ -593,11 +601,11 @@ def train_EMG_cnn(model, train_loader, criterion, optimizer, epochs):
             # Calculate accuracy
             labels_idx = torch.argmax(label, dim=label.dim()-1)
             _, predicted = torch.max(outputs, 1)
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
 
             # Exact match ratio calculation
-            exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
+            exact_matches += (predicted == labels_idx).all(dim=0).sum().item()
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -622,6 +630,7 @@ def evaluate_EMG_cnn(model, val_loader, criterion):
     with torch.no_grad():
         for emg, label in val_loader:
             outputs = model(emg)
+            label = label.float()
             loss = criterion(outputs, label)
             running_loss += loss.item()
             labels_idx = torch.argmax(label, dim=label.dim()-1)
@@ -635,11 +644,12 @@ def evaluate_EMG_cnn(model, val_loader, criterion):
             else:
                 labels_data.append(labels_idx.cpu().numpy())
                 y_true.append(labels_idx.cpu().numpy())
-            total += label.size(0)
+            total += labels_idx.size(0)
             correct += (predicted == labels_idx).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
+    print(f"Test Loss: {val_loss}, Test Accuracy: {val_accuracy}")
     return val_loss, val_accuracy, y_true, y_pred, np.array(emg_data), np.array(labels_data), np.array(prediction)
 
 def inference_EMG_cnn(model, emg_input):

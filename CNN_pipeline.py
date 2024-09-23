@@ -407,7 +407,7 @@ def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save
     #val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=validation_dataset, model=model, criterion=criterion, multiclass=False, wandb_project=None)
     validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
     val_loss, val_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = evaluate_cnn(model, validation_loader, criterion)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
@@ -420,7 +420,8 @@ def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT TO SAVE DATA
+    #np.savez(file_path, **data_dict)
     return model
 
 def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -431,7 +432,7 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
         'num_classes': num_classes,
         'hidden_sizes_emg': [256, 128, 128],
         'hidden_sizes_imu': [256, 128, 128],
-        'input_shape_emg': num_emg_channels*4,
+        'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 18,
         'dropout_rate': 0.1
     }
@@ -443,13 +444,13 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
         hidden_sizes_emg=config['hidden_sizes_emg'], 
         hidden_sizes_imu=config['hidden_sizes_imu'], 
         dropout_rate=config['dropout_rate'],
-        raw_imu=True
+        #raw_imu=True
     )
     if model_path is not None:
         model.load_state_dict(torch.load(model_path))
     train_config = {"batch_size": 32,
                     "epochs": 32,
-                    "criterion": "bce_with_logits",
+                    "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
     # Create data loaders
@@ -457,7 +458,7 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
     # Evaluate the model on validation set
     validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
     val_loss, val_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = evaluate_cnn(model, validation_loader, criterion)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
@@ -470,7 +471,8 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT TO SAVE DATA
+    #np.savez(file_path, **data_dict)
     return model
 
 def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -503,8 +505,8 @@ def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=
     train_config_EMG = {
         "batch_size": 32,
         "epochs": 32,
-        "optimizer": "sgd",
-        "learning_rate": 0.01}
+        "optimizer": "adam",
+        "learning_rate": 0.001}
     train_loader = DataLoader(train_data, train_config_EMG['batch_size'], shuffle=True)
     # optimizer
     criterion = nn.CrossEntropyLoss()
@@ -512,7 +514,7 @@ def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=
     train_accuracy, train_loss = train_EMG_cnn(model, train_loader, criterion, optimizer, train_config_EMG['epochs'])
     validation_loader = DataLoader(val_data, batch_size=train_config_EMG['batch_size'], shuffle=False)
     test_loss, test_accuracy, y_true, y_pred, emg_data, label_data, predictions = evaluate_EMG_cnn(model, validation_loader, criterion)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     if save:
         model_path = model_path_save
@@ -526,7 +528,8 @@ def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=
         'label': np.array(label_data),
         'prediction': np.array(predictions)
     }
-    np.savez(file_path, **data_dict)
+    # WAIT TO SAVE DATA
+    #np.savez(file_path, **data_dict)
     return model
 
 #%% Code for testing the pipelines on saved data
