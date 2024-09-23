@@ -15,12 +15,18 @@ num_emg_channels = 9
 class MyMultimodalNetworkLSTM(nn.Module):
     def __init__(self, input_shape_emg, input_shape_imu, num_classes, hidden_sizes_emg, hidden_sizes_imu, dropout_rate, raw_imu=None, squeeze=None):
         super(MyMultimodalNetworkLSTM, self).__init__()
-        self.emg_input_shape = input_shape_emg
-        self.imu_input_shape = input_shape_imu
+        self.timesteps = 10  # Number of timesteps for sliding window
+        self.emg_input_shape = input_shape_emg# * self.timesteps
+        self.imu_input_shape = input_shape_imu# * self.timesteps
         self.num_classes = num_classes
         self.hidden_sizes_emg = hidden_sizes_emg
         self.hidden_sizes_imu = hidden_sizes_imu
         self.dropout_rate = dropout_rate
+        # Initialize the EMG buffer for sliding window
+        self.emg_ts = []
+        # Initialize the IMU buffer for sliding window
+        self.imu_ts = []
+
         if squeeze is not None:
             self.squeeze = True
         else:
@@ -31,7 +37,8 @@ class MyMultimodalNetworkLSTM(nn.Module):
         if raw_imu == True:
             emg_input_size = self.emg_input_shape
         else:
-            emg_input_size = self.emg_input_shape[1]  # Input features for LSTM
+            # TO FIX
+            emg_input_size = self.emg_input_shape#[1]  # Input features for LSTM
         for emg_hidden_size in self.hidden_sizes_emg:
             self.emg_lstm_layers.append(nn.LSTM(emg_input_size, emg_hidden_size, batch_first=True))
             emg_input_size = emg_hidden_size
@@ -49,25 +56,59 @@ class MyMultimodalNetworkLSTM(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, emg, imu):
+        # Add new input to buffers 
+        emg = emg.reshape(emg.size(0),-1)
+
+        if emg.size(0) != 32 or imu.size(0) != 32:
+            # Discard if not enough data for filling batch, otherwise error when concatenating
+            return None
+        
+        self.emg_ts.append(emg)
+        self.imu_ts.append(imu)
+
+        # Check if the buffer is full (i.e., has reached the window size)
+        if len(self.emg_ts) < self.timesteps:
+            # Not enough data to proceed, return None or a dummy tensor
+            return None
+
+        # If buffer is full, stack the inputs for LSTM processing
+        emg_sequence = torch.cat(self.emg_ts, dim=1)  # Combine inputs along the time dimension
+        imu_sequence = torch.cat(self.imu_ts, dim=1)
+        #print("emg and imu sequence")
+        #print(emg_sequence.size())
+        #print(imu_sequence.size())
+
+        # After forward pass, remove the oldest time step from the buffer (sliding window effect)
+        self.emg_ts.pop(0)
+        self.imu_ts.pop(0)
+
         # Check if input tensors have the correct shape
-        batch_size = emg.size(0)
-        if not self.squeeze:
-            emg = emg.reshape(batch_size,1,num_emg_channels*4)
+        #batch_size = emg_sequence.size(0)
+        #if not self.squeeze:
+            #emg_sequence = emg_sequence.reshape(batch_size,self.timesteps,-1)
+
+        # Reshape `emg_sequence` and `imu_sequence` back to [batch_size, timesteps, input_size]
+        batch_size = emg_sequence.size(0)
+        emg_input_size = emg_sequence.size(1) // self.timesteps  # Infer input size
+        imu_input_size = imu_sequence.size(1) // self.timesteps
+
+        emg_sequence = emg_sequence.view(batch_size, self.timesteps, emg_input_size)
+        imu_sequence = imu_sequence.view(batch_size, self.timesteps, imu_input_size)
 
         # EMG pathway
         for emg_lstm in self.emg_lstm_layers:
-            emg, _ = emg_lstm(emg)
-        emg = emg[:, -1, :]  # Output from the last time step
+            emg_sequence, _ = emg_lstm(emg_sequence)
+        emg_sequence = emg_sequence[:, -1, :]  # Output from the last time step
 
         # IMU pathway
-        if len(imu.size()) == 2:
-            imu = imu.unsqueeze(1)  # Add a sequence dimension: (batch_size, 1, features)
+        if len(imu_sequence.size()) == 2:
+            imu_sequence = imu_sequence.unsqueeze(1)  # Add a sequence dimension: (batch_size, 1, features)
         for imu_lstm in self.imu_lstm_layers:
-            imu, _ = imu_lstm(imu)
-        imu = imu[:, -1, :] # Output from the last time step
+            imu_sequence, _ = imu_lstm(imu_sequence)
+        imu_sequence = imu_sequence[:, -1, :] # Output from the last time step
 
         # Concatenate EMG and IMU outputs
-        concat_out = torch.cat((emg, imu), dim=1)
+        concat_out = torch.cat((emg_sequence, imu_sequence), dim=1)
 
         # Fully connected layer
         output = self.fc_concat(concat_out)
@@ -89,9 +130,16 @@ def train_lstm(model, train_loader, criterion, optimizer, epochs):
             # Forward pass
             outputs = model(emg, imu)
 
-            # Compute loss
+            # Check if the model has returned None (buffer not filled yet)
+            if outputs is None:
+                continue  # Skip this iteration if there are not enough time steps
+
+            # Convert labels to float for BCEWithLogitsLoss
+            label = label.float()
+
+            # Compute loss (BCEWithLogitsLoss expects float inputs)
             loss = criterion(outputs, label)
-            
+
             # Backpropagation and optimization
             loss.backward()
             optimizer.step()
@@ -99,14 +147,13 @@ def train_lstm(model, train_loader, criterion, optimizer, epochs):
             # Accumulate loss
             running_loss += loss.item()
 
-            # Calculate accuracy
-            labels_idx = torch.argmax(label, dim=label.dim()-1)
-            _, predicted = torch.max(outputs, 1)
-            total += label.size(0)
-            correct += (predicted == labels_idx).sum().item()
+            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
+            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
+            correct += (predicted == label).sum().item()
+            total += label.size(0) * label.size(1)  # Multi-label, so account for each class
 
-            # Exact match ratio calculation
-            exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
+            # Exact match ratio calculation (all labels must match)
+            exact_matches += (predicted == label).all(dim=1).sum().item()
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -132,22 +179,29 @@ def evaluate_lstm(model, val_loader, criterion):
     with torch.no_grad():
         for emg, imu, label in val_loader:
             outputs = model(emg, imu)
+            # Check if the model has returned None (buffer not filled yet)
+            if outputs is None:
+                continue  # Skip this iteration if there are not enough time steps
+            # Convert labels to float for BCEWithLogitsLoss
+            label = label.float()
             loss = criterion(outputs, label)
             running_loss += loss.item()
-            labels_idx = torch.argmax(label, dim=label.dim()-1)
-            _, predicted = torch.max(outputs, 1)
+            #labels_idx = torch.argmax(label, dim=label.dim()-1)
+            #_, predicted = torch.max(outputs, 1)
+            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
+            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
             # for storing all predictions and inputs
             prediction.extend(predicted.cpu().numpy())
             emg_data.extend(emg.cpu().numpy())
             imu_data.extend(imu.cpu().numpy())
             if label.dim() > 1:
-                labels_data.extend(labels_idx.cpu().numpy())
-                y_true.extend(labels_idx.cpu().numpy())
+                labels_data.extend(label.cpu().numpy())
+                y_true.extend(label.cpu().numpy())
             else:
-                labels_data.append(labels_idx.cpu().numpy())
-                y_true.append(labels_idx.cpu().numpy())
-            total += label.size(0)
-            correct += (predicted == labels_idx).sum().item()
+                labels_data.append(label.cpu().numpy())
+                y_true.append(label.cpu().numpy())
+            total += label.size(0) * label.size(1)
+            correct += (predicted == label).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
@@ -163,14 +217,17 @@ def inference_lstm(model, emg_input, imu_input):
 class MyNetworkLSTM(nn.Module):
     def __init__(self, input_shape_emg, num_classes, hidden_sizes_emg, dropout_rate):
         super(MyNetworkLSTM, self).__init__()
-        self.emg_input_shape = input_shape_emg
+        self.timesteps = 10  # Number of timesteps for sliding window
+        self.emg_input_shape = input_shape_emg# * self.timesteps
         self.num_classes = num_classes
         self.hidden_sizes_emg = hidden_sizes_emg
         self.dropout_rate = dropout_rate
+        # Initialize the EMG buffer for sliding window
+        self.emg_ts = []
 
         # EMG pathway using LSTM
         self.emg_lstm_layers = nn.ModuleList()
-        emg_input_size = self.emg_input_shape[1]  # Input features for LSTM
+        emg_input_size = self.emg_input_shape#[1]  # Input features for LSTM
         for emg_hidden_size in self.hidden_sizes_emg:
             self.emg_lstm_layers.append(nn.LSTM(emg_input_size, emg_hidden_size, batch_first=True))
             emg_input_size = emg_hidden_size
@@ -182,13 +239,39 @@ class MyNetworkLSTM(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, emg):
+        # Add new input to buffers 
+        emg = emg.reshape(emg.size(0),-1)
+
+        if emg.size(0) != 32:
+            # Discard if not enough data for filling batch, otherwise error when concatenating
+            return None
+        
+        self.emg_ts.append(emg)
+
+        # Check if the buffer is full (i.e., has reached the window size)
+        if len(self.emg_ts) < self.timesteps:
+            # Not enough data to proceed, return None or a dummy tensor
+            return None
+
+        # If buffer is full, stack the inputs for LSTM processing
+        emg_sequence = torch.cat(self.emg_ts, dim=1)  # Combine inputs along the time dimension
+
+        # After forward pass, remove the oldest time step from the buffer (sliding window effect)
+        self.emg_ts.pop(0)
+
+        # Reshape `emg_sequence` and `imu_sequence` back to [batch_size, timesteps, input_size]
+        batch_size = emg_sequence.size(0)
+        emg_input_size = emg_sequence.size(1) // self.timesteps  # Infer input size
+
+        emg_sequence = emg_sequence.view(batch_size, self.timesteps, emg_input_size)
+
         # EMG pathway
         for emg_lstm in self.emg_lstm_layers:
-            emg, _ = emg_lstm(emg)
-        emg = emg[:, -1, :]  # Output from the last time step
+            emg_sequence, _ = emg_lstm(emg_sequence)
+        emg_sequence = emg_sequence[:, -1, :]  # Output from the last time step
 
         # Fully connected layer
-        output = self.fc_concat(emg)
+        output = self.fc_concat(emg_sequence)
         output = self.dropout(output)
         # output = self.softmax(output)
 
@@ -208,6 +291,13 @@ def train_EMG_lstm(model, train_loader, criterion, optimizer, epochs):
             # Forward pass
             outputs = model(emg)
 
+            # Check if the model has returned None (buffer not filled yet)
+            if outputs is None:
+                continue  # Skip this iteration if there are not enough time steps
+
+            # Convert labels to float for BCEWithLogitsLoss
+            label = label.float()
+
             # Compute loss
             loss = criterion(outputs, label)
             
@@ -218,14 +308,13 @@ def train_EMG_lstm(model, train_loader, criterion, optimizer, epochs):
             # Accumulate loss
             running_loss += loss.item()
 
-            # Calculate accuracy
-            labels_idx = torch.argmax(label, dim=label.dim()-1)
-            _, predicted = torch.max(outputs, 1)
-            total += label.size(0)
-            correct += (predicted == labels_idx).sum().item()
+            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
+            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
+            total += label.size(0) * label.size(1)
+            correct += (predicted == label).sum().item()
 
             # Exact match ratio calculation
-            exact_matches += (predicted == labels_idx).sum().item() == label.size(0)
+            exact_matches += (predicted == label).sum().item() == label.size(0)
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -251,21 +340,26 @@ def evaluate_EMG_lstm(model, val_loader, criterion):
     with torch.no_grad():
         for emg, label in val_loader:
             outputs = model(emg)
+            # Check if the model has returned None (buffer not filled yet)
+            if outputs is None:
+                continue  # Skip this iteration if there are not enough time steps
+            # Convert labels to float for BCEWithLogitsLoss
+            label = label.float()
             loss = criterion(outputs, label)
             running_loss += loss.item()
-            labels_idx = torch.argmax(label, dim=label.dim()-1)
-            _, predicted = torch.max(outputs, 1)
+            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
+            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
             # for storing all predictions and inputs
             prediction.extend(predicted.cpu().numpy())
             emg_data.extend(emg.cpu().numpy())
             if label.dim() > 1:
-                labels_data.extend(labels_idx.cpu().numpy())
-                y_true.extend(labels_idx.cpu().numpy())
+                labels_data.extend(label.cpu().numpy())
+                y_true.extend(label.cpu().numpy())
             else:
-                labels_data.append(labels_idx.cpu().numpy())
-                y_true.append(labels_idx.cpu().numpy())
-            total += label.size(0)
-            correct += (predicted == labels_idx).sum().item()
+                labels_data.append(label.cpu().numpy())
+                y_true.append(label.cpu().numpy())
+            total += label.size(0) * label.size(1)
+            correct += (predicted == label).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
