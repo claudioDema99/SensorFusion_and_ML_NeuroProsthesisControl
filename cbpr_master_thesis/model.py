@@ -388,47 +388,92 @@ class MyMultimodalNetworkCNN(nn.Module):
 
         # EMG pathway using CNN
         self.emg_conv_layers = nn.ModuleList()
-        self.emg_pool = nn.MaxPool1d(kernel_size=2, stride=1)
+        self.emg_bn_layers = nn.ModuleList()  # BatchNorm layers for EMG
+        self.emg_pool = nn.MaxPool1d(kernel_size=2, stride=2)  # Increased pooling stride
         emg_input_channels = self.emg_input_shape[0]  # 9 EMG channels
         emg_output_size = self.emg_input_shape[1]  # 4 features per channel
+
         for emg_hidden_size in self.hidden_sizes_emg:
             self.emg_conv_layers.append(nn.Conv1d(emg_input_channels, emg_hidden_size, kernel_size=3, padding=1))
+            self.emg_bn_layers.append(nn.BatchNorm1d(emg_hidden_size))  # Add BatchNorm
             emg_input_channels = emg_hidden_size
             # Update output size after convolution, but with careful pooling
-            emg_output_size = max(emg_output_size - 2 + 1, 1)  # Ensures size doesn't drop below 1
+            emg_output_size = max(emg_output_size - 2 + 1, 1)
             if emg_output_size > 1:
                 emg_output_size = emg_output_size // 2  # Pooling reduces by half
 
         # IMU pathway using CNN
         self.imu_conv_layers = nn.ModuleList()
-        self.imu_pool = nn.MaxPool1d(kernel_size=2, stride = 1)
+        self.imu_bn_layers = nn.ModuleList()  # BatchNorm layers for IMU
+        self.imu_pool = nn.MaxPool1d(kernel_size=2, stride=2)  # Increased pooling stride
         imu_input_channels = 1  # Treat IMU as 1 channel
         imu_output_size = self.imu_input_shape  # 9 IMU features
+
         for imu_hidden_size in self.hidden_sizes_imu:
             self.imu_conv_layers.append(nn.Conv1d(imu_input_channels, imu_hidden_size, kernel_size=3, padding=1))
+            self.imu_bn_layers.append(nn.BatchNorm1d(imu_hidden_size))  # Add BatchNorm
             imu_input_channels = imu_hidden_size
             imu_output_size = max(imu_output_size - 2 + 1, 1)
             if imu_output_size > 1:
                 imu_output_size = imu_output_size // 2
+
         # Flattened Size Calculation
         emg_flattened_size = self.hidden_sizes_emg[-1] * emg_output_size  # Flattened size from EMG CNN path
         imu_flattened_size = self.hidden_sizes_imu[-1] * imu_output_size  # Flattened size from IMU CNN path
 
-        # Fully connected layer for concatenation
-        fc_input_size = emg_flattened_size + (imu_flattened_size * (self.imu_input_shape - 3))  # Combine EMG and IMU flattened sizes
-        self.fc_concat = nn.Linear(fc_input_size, self.num_classes)
+        # Fully connected layers with bottleneck
+        fc_input_size = emg_flattened_size + imu_flattened_size  # Combine EMG and IMU flattened sizes
+        self.fc_concat = nn.Linear(fc_input_size, 512)  # Bottleneck layer
+        self.fc_out = nn.Linear(512, self.num_classes)  # Final output layer
         self.dropout = nn.Dropout(dropout_rate)
-        
+
+        # Weight initialization
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+
     def forward(self, emg, imu):
         # EMG pathway
-        #emg = emg.transpose(1, 2)  # Change shape to (batch_size, 9 channels, 4 features)
-        for emg_conv in self.emg_conv_layers:
-            emg = self.emg_pool(F.relu(emg_conv(emg)))  # Apply Conv + Pool
+        for i, emg_conv in enumerate(self.emg_conv_layers):
+            residual = emg  # Save input for residual connection
+            emg = F.relu(self.emg_bn_layers[i](emg_conv(emg)))  # Apply Conv + BatchNorm + ReLU
+            if emg.size(2) > 1:
+                emg = self.emg_pool(emg)  # Apply Pool
+            # Adjust residual size before addition if necessary
+            # Assuming the mismatch happens during residual connection
+            print(f"emg size: {emg.size()}, residual size: {residual.size()}")
+            # Ensure spatial dimensions match
+            if emg.size(2) != residual.size(2):
+                residual = F.interpolate(residual, size=emg.size(2), mode='nearest')
 
+            # Ensure number of channels match (dimension 1)
+            if emg.size(1) != residual.size(1):
+                residual_conv = nn.Conv1d(residual.size(1), emg.size(1), kernel_size=1)  # 1x1 conv to match channels
+                residual = residual_conv(residual)
+
+            print(f"After interpolation - emg size: {emg.size()}, residual size: {residual.size()}")
+
+            # Add residual connection after adjusting sizes
+            emg += residual
         # IMU pathway
         imu = imu.unsqueeze(1)  # Add channel dimension: (batch_size, 1, 9)
-        for imu_conv in self.imu_conv_layers:
-            imu = self.imu_pool(F.relu(imu_conv(imu)))  # Apply Conv + Pool
+        for i, imu_conv in enumerate(self.imu_conv_layers):
+            residual = imu  # Save input for residual connection
+            imu = F.relu(self.imu_bn_layers[i](imu_conv(imu)))  # Apply Conv + BatchNorm + ReLU
+            if imu.size(2) > 1:
+                imu = self.imu_pool(imu)  # Apply Pool
+            # Adjust residual size before addition if necessary
+            if imu.size(2) != residual.size(2):
+                residual = F.interpolate(residual, size=imu.size(2), mode='nearest')
+            if imu.size(1) != residual.size(1):
+                residual_conv = nn.Conv1d(residual.size(1), imu.size(1), kernel_size=1)
+                residual = residual_conv(residual)
+            imu += residual
 
         # Flatten outputs
         emg = emg.view(emg.size(0), -1)  # Flatten the EMG output
@@ -438,9 +483,11 @@ class MyMultimodalNetworkCNN(nn.Module):
         concat_out = torch.cat((emg, imu), dim=1)
 
         # Fully connected layer
-        output = self.fc_concat(concat_out)
-        output = self.dropout(output)
+        output = F.relu(self.fc_concat(concat_out))  # Apply bottleneck layer
+        output = self.dropout(output)  # Apply dropout
+        output = self.fc_out(output)  # Final output
         return output
+
 
 def train_cnn(model, train_loader, criterion, optimizer, epochs):
     model.train()
