@@ -482,4 +482,46 @@ def comparison_analysis(metrics_df):
     sns.pointplot(x='Input_Modality', y='Accuracy', hue='Classification_Method', data=data, dodge=True, markers=["o", "s", "D"], linestyles=["-", "--", ":"])
     plt.title('Interaction Plot: Accuracy by Classification Method and Input Modality')
     plt.show()
-    return
+    return data
+
+# Plot Heatmap for Accuracy values
+def plot_heatmap(accuracy_matrix):
+    plt.figure(figsize=(8,6))
+    sns.heatmap(accuracy_matrix, annot=True, cmap='coolwarm', fmt='.3f', linewidths=0.5)
+    plt.title('Heatmap: Accuracy Across Classification Methods and Input Modalities')
+    plt.xlabel('Input Modality')
+    plt.ylabel('Classification Method')
+    plt.show()
+
+# Bar Plot for Mean Accuracy with Error Bars (Standard Deviation)
+def bar_chart_with_error_bars(data):
+    plt.figure(figsize=(10,6))
+    sns.barplot(x='Classification_Method', 
+                y='Accuracy', 
+                hue='Input_Modality', 
+                data=data, 
+                ci='sd',  # Standard deviation as error bars
+                capsize=.2)  # Caps on error bars
+    plt.title('Bar Chart: Accuracy by Classification Method and Input Modality')
+    plt.ylabel('Mean Accuracy')
+    plt.xlabel('Classification Method')
+    plt.legend(title='Input Modality')
+    plt.show()
+
+'''
+# Interaction Plot for Accuracy by Classification Method and Input Modality
+def interaction_plot(data):
+    sns.pointplot(x='Input_Modality', 
+                  y='Accuracy', 
+                  hue='Classification_Method', 
+                  data=data, 
+                  dodge=True, 
+                  markers=["o", "s", "D"], 
+                  linestyles=["-", "--", ":"],
+                  ci='sd')  # ci='sd' adds standard deviation as error bars
+    plt.title('Interaction Plot: Accuracy by Classification Method and Input Modality')
+    plt.ylabel('Mean Accuracy')
+    plt.xlabel('Input Modality')
+    plt.legend(title='Classification Method')
+    plt.show()
+'''

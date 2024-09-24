@@ -22,7 +22,7 @@ import pandas as pd
 from cbpr_master_thesis.preprocessing_and_normalization import notch_filter, bandpass_filter, highpass_filter, lowpass_filter, normalize_EMG_all_channels, convert_to_SI, save_max_emg_values, normalize_raw_imu
 from cbpr_master_thesis.feature_extraction import create_windows, get_new_feature_vector, extract_EMG_features, extract_quaternions, extract_quaternions_new, extract_angles_from_rot_matrix
 from cbpr_master_thesis.model import MyMultimodalNetwork, MyEMGNetwork, train_EMG, test_EMG, get_tensor_dataset, train_multiclass, test_multiclass, test_and_storing, test_EMG_and_storing
-from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance, data_analysis, plot_accuracy_boxplots, plot_performance_lineplot, plot_f1_scores_barchart, comparison_analysis
+from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance, data_analysis, plot_accuracy_boxplots, plot_performance_lineplot, plot_f1_scores_barchart, comparison_analysis, plot_heatmap, bar_chart_with_error_bars
 
 DEFAULT_RANDOM_SEED = 0
 
@@ -312,7 +312,7 @@ def pipeline(dataset_name, label_name, num_classes):
     # or weighted BCE
     trained_model = train_and_log(train_config, config, training_dataset=train_data, model=model, wandb_enabled=False, wandb_project="SL_multiclass")
     test_accuracy, y_true, y_pred = evaluate_and_log(train_config, val_data, trained_model, wandb_project="SL_multiclass")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     #plot_feature_importance(trained_model, train_data[:][0], train_data[:][1])
     return trained_model
@@ -341,7 +341,7 @@ def pipeline_raw_IMU(dataset_name, label_name, num_classes):
     # Evaluate the model on validation set
     val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=val_data, model=model)
     print(f"Validation Accuracy: {val_accuracy}")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     return model
 
 def pipeline_EMG(dataset_name, label_name, num_classes):
@@ -381,7 +381,7 @@ def pipeline_EMG(dataset_name, label_name, num_classes):
     train_accuracy, train_loss = train_EMG(model, train_loader, criterion, optimizer, train_config_EMG['epochs'], multiclass=True)
     validation_loader = DataLoader(val_data, batch_size=32)
     test_accuracy, y_true, y_pred = test_EMG(model, validation_loader, multiclass=True)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     return model
 
@@ -400,6 +400,8 @@ torch.save(trained_model_raw_imu.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
+global_epochs = 4
+base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
     #emg, imu, label, pred = load_data_from_online(dataset_name)
@@ -408,6 +410,8 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
         'num_classes': num_classes,
         'hidden_sizes_emg': [256, 256, 256],
         'hidden_sizes_imu': [256, 256, 256],
+        #'hidden_sizes_emg': [512, 1024, 1024, 1024, 512],
+        #'hidden_sizes_imu': [512, 1024, 1024, 1024, 512],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 9, #9
         'dropout_rate': 0.1
@@ -417,7 +421,7 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
         model.load_state_dict(torch.load(model_path))
     #batch_size ???
     train_config = {"batch_size": 32,
-                    "epochs": int(32), #256 -> 99.5%
+                    "epochs": global_epochs, #256 -> 99.5%
                     "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
@@ -430,7 +434,7 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
     if save:
         model_path = model_path_save
         torch.save(trained_model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "ffnn_angles_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
@@ -450,6 +454,8 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
         'num_classes': num_classes,
         'hidden_sizes_emg': [256, 256, 256],
         'hidden_sizes_imu': [256, 256, 256],
+        #'hidden_sizes_emg': [1024, 1024, 1024, 1024, 1024],
+        #'hidden_sizes_imu': [1024, 1024, 1024, 1024, 1024],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 18, #9
         'dropout_rate': 0.1
@@ -459,7 +465,7 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
         model.load_state_dict(torch.load(model_path))
     training_dataset, validation_dataset = get_tensor_dataset(emg, imu, label)
     train_config = {"batch_size": 32,
-                    "epochs": 32,
+                    "epochs": global_epochs,
                     "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
@@ -472,7 +478,7 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
     if save:
         model_path = model_path_save
         torch.save(trained_model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "ffnn_raw_imu_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
@@ -499,6 +505,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
     config_EMG = {
         'num_classes': num_classes,
         'hidden_sizes_emg': [512, 256, 256, 256],
+        #'hidden_sizes_emg': [512, 1024, 1024, 1024, 512],
         'input_shape_emg': (num_emg_channels, 4),
         'dropout_rate': 0.1
     }
@@ -507,7 +514,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
         model.load_state_dict(torch.load(model_path))
     train_config_EMG = {
         "batch_size": 32,
-        "epochs": 32,
+        "epochs": global_epochs,
         "criterion": "",
         "optimizer": "sgd",
         "learning_rate": 0.1}
@@ -523,7 +530,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "ffnn_emg_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
@@ -716,4 +723,14 @@ plot_performance_lineplot(metrics_df, 'LSTM')
 plot_f1_scores_barchart(metrics_df, 'FFNN')
 plot_f1_scores_barchart(metrics_df, 'CNN')
 plot_f1_scores_barchart(metrics_df, 'LSTM')
-comparison_analysis(metrics_df)
+
+data = comparison_analysis(metrics_df)
+# Pivot the data to create a matrix of Classification_Method vs Input_Modality with Accuracy values
+accuracy_matrix = data.pivot_table(values='Accuracy', 
+                                   index='Classification_Method', 
+                                   columns='Input_Modality')
+# Call the function
+plot_heatmap(accuracy_matrix)
+# Call the function
+bar_chart_with_error_bars(data)
+# %%

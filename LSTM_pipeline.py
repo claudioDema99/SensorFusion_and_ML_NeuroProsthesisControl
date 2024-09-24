@@ -279,7 +279,7 @@ def pipeline_lstm(dataset_name, label_name, num_classes):
     # Evaluate the model on validation set
     val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=val_data, model=model, criterion=criterion, multiclass=False, wandb_project=None)
     print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     return model
 
 def pipeline_raw_IMU_lstm(dataset_name, label_name, num_classes):
@@ -315,7 +315,7 @@ def pipeline_raw_IMU_lstm(dataset_name, label_name, num_classes):
     # Evaluate the model on validation set
     val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=val_data, model=model, criterion=criterion, multiclass=False, wandb_project=None)
     print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     return model
 
 def pipeline_EMG_lstm(dataset_name, label_name, num_classes):
@@ -362,7 +362,7 @@ def pipeline_EMG_lstm(dataset_name, label_name, num_classes):
     train_accuracy, train_loss = train_EMG_lstm(model, train_loader, criterion, optimizer, train_config_EMG['epochs'])
     validation_loader = DataLoader(val_data, batch_size=train_config_EMG['batch_size'], shuffle=False)
     test_loss, test_accuracy, y_true, y_pred = evaluate_EMG_lstm(model, validation_loader, criterion)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     return model
 
@@ -379,6 +379,8 @@ torch.save(trained_model_raw_imu_lstm.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
+global_epochs = 4
+base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
     #emg, imu, label, pred = load_data_from_online(dataset_name)
@@ -388,6 +390,8 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 64],
         'hidden_sizes_imu': [128, 64, 64],
+        #'hidden_sizes_emg': [256, 512, 256],
+        #'hidden_sizes_imu': [256, 512, 256],
         'input_shape_emg': num_emg_channels * 4,#(num_emg_channels, 4),
         'input_shape_imu': 9,
         'dropout_rate': 0.1
@@ -405,7 +409,7 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
     if model_path is not None:
         model.load_state_dict(torch.load(model_path))
     train_config = {"batch_size": 32,
-                    "epochs": 32,
+                    "epochs": global_epochs,
                     "criterion": "bce_with_logits",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
@@ -418,7 +422,7 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "lstm_angles_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
@@ -439,6 +443,8 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 64, 32],
         'hidden_sizes_imu': [128, 64, 32],
+        #'hidden_sizes_emg': [512, 512, 512],
+        #'hidden_sizes_imu': [512, 512, 512],
         'input_shape_emg': num_emg_channels * 4,#num_emg_channels*4,
         'input_shape_imu': 18,
         'dropout_rate': 0.1
@@ -456,7 +462,7 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
     if model_path is not None:
         model.load_state_dict(torch.load(model_path))
     train_config = {"batch_size": 32,
-                    "epochs": 32,
+                    "epochs": global_epochs,
                     "criterion": "bce_with_logits",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
@@ -470,7 +476,7 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "lstm_raw_imu_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
@@ -498,6 +504,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     config = {
         'num_classes': num_classes,
         'hidden_sizes_emg': [128, 128, 64],
+        #'hidden_sizes_emg': [256, 512, 256],
         'input_shape_emg': num_emg_channels * 4,#(num_emg_channels, 4),
         'dropout_rate': 0.1
     }
@@ -512,7 +519,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
         model.load_state_dict(torch.load(model_path))
     train_config_EMG = {
         "batch_size": 32,
-        "epochs": 32,
+        "epochs": global_epochs,
         "criterion": "bce_with_logits",
         "optimizer": "adam",
         "learning_rate": 0.001} 
@@ -528,7 +535,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     if save:
         model_path = model_path_save
         torch.save(model, model_path)
-    directory = "C:/Users/claud/Desktop/CBPR_Recordings/" + participant_folder
+    directory = base_folder + participant_folder
     file_name = "lstm_emg_dataset.npz"
     file_path = os.path.join(directory, file_name) if directory else file_name
     data_dict = {
