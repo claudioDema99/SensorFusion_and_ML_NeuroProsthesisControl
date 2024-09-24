@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 from cbpr_master_thesis.preprocessing_and_normalization import notch_filter, bandpass_filter, highpass_filter, lowpass_filter, normalize_EMG_all_channels, convert_to_SI, save_max_emg_values, normalize_raw_imu
 from cbpr_master_thesis.feature_extraction import create_windows, get_new_feature_vector, extract_EMG_features, extract_quaternions, extract_quaternions_new, extract_angles_from_rot_matrix
 from cbpr_master_thesis.model import MyMultimodalNetworkCNN, train_cnn, evaluate_cnn, inference_cnn, get_tensor_dataset, MyNetworkCNN, train_EMG_cnn, evaluate_EMG_cnn
-from cbpr_master_thesis.data_analysis import plot_confusion_matrix, undersample_majority_class_first_n, extract_and_balance
+from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance
 
 DEFAULT_RANDOM_SEED = 0
 
@@ -421,7 +421,7 @@ def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save
         'prediction': np.array(predictions)
     }
     # WAIT TO SAVE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return model
 
 def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -472,7 +472,7 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
         'prediction': np.array(predictions)
     }
     # WAIT TO SAVE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return model
 
 def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -529,7 +529,7 @@ def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=
         'prediction': np.array(predictions)
     }
     # WAIT TO SAVE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return model
 
 #%% Code for testing the pipelines on saved data

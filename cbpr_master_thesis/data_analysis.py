@@ -8,6 +8,9 @@ from sklearn.metrics import confusion_matrix, accuracy_score, classification_rep
 import pandas as pd
 from scipy import signal
 import pickle
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from cbpr_master_thesis.preprocessing_and_normalization import highpass_filter, bandpass_filter, notch_filter, normalize_EMG_all_channels, normalize_raw_imu, convert_to_SI
 from cbpr_master_thesis.feature_extraction import extract_EMG_features, create_windows
 
@@ -297,6 +300,13 @@ def data_analysis():
             y_pred = data['prediction']
             model, data_type = dataset.split('_')[:2]
 
+            # If y_true and y_pred are one-hot encoded, convert them to class labels
+            if len(y_true.shape) > 1 and y_true.shape[1] > 1:
+                y_true = np.argmax(y_true, axis=1)
+
+            if len(y_pred.shape) > 1 and y_pred.shape[1] > 1:
+                y_pred = np.argmax(y_pred, axis=1)
+
             # Confusion matrix
             cm = confusion_matrix(y_true, y_pred)
             confusion_matrices[f'{participant_folder[:-1]}_{model}_{data_type}'] = cm
@@ -366,9 +376,6 @@ with open("confusion_matrices.pkl", "rb") as f:
 
 # %% PLOTS FROM DATA ANALYSIS
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 def plot_accuracy_boxplots(metrics_df, model_type):
     # Filter data for the specified model type (FFNN, CNN, LSTM)
     filtered_df = metrics_df[metrics_df['Model'] == model_type]
@@ -401,14 +408,27 @@ def plot_f1_scores_barchart(metrics_df, model_type):
     # Filter data for the specified model type
     filtered_df = metrics_df[metrics_df['Model'] == model_type]
     
-    # Create a bar chart showing the F1-scores for each class
+    # Iterate over the unique input types (EMG, Angles, IMU)
     for input_type in filtered_df['Data_Type'].unique():
+        # Filter data for each input type
         class_f1_df = filtered_df[filtered_df['Data_Type'] == input_type]
         
-        # Assuming the class F1-scores are stored as additional columns
-        # Create bar plot for F1-score for each class (e.g., 'Class 0', 'Class 1', etc.)
+        # Extract F1-scores for each class
+        f1_data = []
+        for i in range(5):  # Assuming you have 5 classes (0, 1, 2, 3, 4)
+            class_column = 'F1-Score'
+            if class_column in class_f1_df.columns:
+                f1_score = class_f1_df[class_column].values[0]  # Get the F1-score for class i
+                f1_data.append({'Class': f'Class {i}', 'F1-Score': f1_score})
+            else:
+                print(f'Column {class_column} not found in DataFrame')
+
+        # Convert the list to a DataFrame
+        f1_df = pd.DataFrame(f1_data)
+
+        # Create bar plot for F1-score for each class
         plt.figure(figsize=(10, 6))
-        sns.barplot(x='Class', y='F1-Score', data=class_f1_df)
+        sns.barplot(x='Class', y='F1-Score', data=f1_df)
         plt.title(f'{model_type} - F1-scores for Each Class ({input_type})')
         plt.ylabel('F1-Score')
         plt.ylim(0, 1)
@@ -429,3 +449,37 @@ plot_f1_scores_barchart(metrics_df, 'FFNN')
 plot_f1_scores_barchart(metrics_df, 'CNN')
 plot_f1_scores_barchart(metrics_df, 'LSTM')
 '''
+
+#%% ANOVA and Tukey's HSD
+
+def comparison_analysis(metrics_df):
+    rows = []
+    for index, row in metrics_df.iterrows():
+        rows.append({
+            'Participant': row['Participant'],
+            'Classification_Method': row['Model'],
+            'Input_Modality': row['Data_Type'],
+            'Accuracy': row['Accuracy']
+        })
+    data = pd.DataFrame(rows)
+
+    # Create a formula for the two-way ANOVA
+    model = ols('Accuracy ~ C(Classification_Method) * C(Input_Modality)', data=data).fit()
+
+    # Perform the ANOVA
+    anova_table = sm.stats.anova_lm(model, typ=2)
+
+    print(anova_table)
+
+    # Perform Tukey HSD test for post-hoc analysis
+    tukey = pairwise_tukeyhsd(endog=data['Accuracy'],
+                            groups=data['Classification_Method'], 
+                            alpha=0.05)
+
+    print(tukey)
+
+    # Create a line plot to show interaction between factors
+    sns.pointplot(x='Input_Modality', y='Accuracy', hue='Classification_Method', data=data, dodge=True, markers=["o", "s", "D"], linestyles=["-", "--", ":"])
+    plt.title('Interaction Plot: Accuracy by Classification Method and Input Modality')
+    plt.show()
+    return

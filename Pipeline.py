@@ -15,12 +15,14 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 # IMPORT CUSTOM MODULES
 from cbpr_master_thesis.preprocessing_and_normalization import notch_filter, bandpass_filter, highpass_filter, lowpass_filter, normalize_EMG_all_channels, convert_to_SI, save_max_emg_values, normalize_raw_imu
 from cbpr_master_thesis.feature_extraction import create_windows, get_new_feature_vector, extract_EMG_features, extract_quaternions, extract_quaternions_new, extract_angles_from_rot_matrix
 from cbpr_master_thesis.model import MyMultimodalNetwork, MyEMGNetwork, train_EMG, test_EMG, get_tensor_dataset, train_multiclass, test_multiclass, test_and_storing, test_EMG_and_storing
-from cbpr_master_thesis.data_analysis import plot_confusion_matrix, undersample_majority_class_first_n, extract_and_balance
+from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance, data_analysis, plot_accuracy_boxplots, plot_performance_lineplot, plot_f1_scores_barchart, comparison_analysis
 
 DEFAULT_RANDOM_SEED = 0
 
@@ -438,7 +440,7 @@ def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=Fal
         'prediction': np.array(predictions)
     }
     # WAIT FOR SAVE THE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return trained_model
 
 def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -480,7 +482,7 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
         'prediction': np.array(predictions)
     }
     # WAIT FOR SAVE THE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return model
 
 def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -531,7 +533,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
         'prediction': np.array(predictions)
     }
     # WAIT FOR SAVE THE DATA
-    #np.savez(file_path, **data_dict)
+    np.savez(file_path, **data_dict)
     return model
 
 def pipeline_inference_and_storing(emg, label, model_path, imu=None, save=False):
@@ -702,4 +704,16 @@ for participant_folder in participant_folders:
     raw_imu_model = pipeline_raw_IMU_from_online(data['emg_raw_imu'], data['imu_raw_imu'], data['label_raw_imu'], num_classes=5, model_path=None, save=False, model_path_save = "models/model_ffnn_raw_imu.pth", participant_folder=participant_folder)
     emg_model = pipeline_EMG_from_online(data['emg_emg'], data['label_emg'], num_classes=5, model_path=None, save=False, model_path_save = "models/model_ffnn_emg.pth", participant_folder=participant_folder)
 
-# %%
+# %% DATA ANALYSIS
+
+metrics_df, confusion_matrices = data_analysis()
+plot_accuracy_boxplots(metrics_df, 'FFNN')
+plot_accuracy_boxplots(metrics_df, 'CNN')
+plot_accuracy_boxplots(metrics_df, 'LSTM')
+plot_performance_lineplot(metrics_df, 'FFNN')
+plot_performance_lineplot(metrics_df, 'CNN')
+plot_performance_lineplot(metrics_df, 'LSTM')
+plot_f1_scores_barchart(metrics_df, 'FFNN')
+plot_f1_scores_barchart(metrics_df, 'CNN')
+plot_f1_scores_barchart(metrics_df, 'LSTM')
+comparison_analysis(metrics_df)
