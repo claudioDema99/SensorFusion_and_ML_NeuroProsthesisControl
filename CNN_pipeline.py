@@ -275,7 +275,7 @@ def pipeline_cnn(dataset_name, label_name, num_classes):
     model, train_loss, train_accuracy, criterion = train_and_log(train_config=train_config, model_config=config, training_dataset=train_data, model=model, wandb_enabled=False, multiclass=False, wandb_project=None)
     val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=val_data, model=model, criterion=criterion, multiclass=False, wandb_project=None)
     print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     return model
 
 def pipeline_raw_IMU_cnn(dataset_name, label_name, num_classes):
@@ -311,7 +311,7 @@ def pipeline_raw_IMU_cnn(dataset_name, label_name, num_classes):
     # Evaluate the model on validation set
     val_loss, val_accuracy, y_true, y_pred = evaluate_and_log(train_config, validation_dataset=val_data, model=model, criterion=criterion, multiclass=False, wandb_project=None)
     print(f"Validation Loss: {val_loss}, Validation Accuracy: {val_accuracy}")
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     return model
 
 def pipeline_EMG_cnn(dataset_name, label_name, num_classes):
@@ -357,7 +357,7 @@ def pipeline_EMG_cnn(dataset_name, label_name, num_classes):
     train_accuracy, train_loss = train_EMG_cnn(model, train_loader, criterion, optimizer, train_config_EMG['epochs'])
     validation_loader = DataLoader(val_data, batch_size=train_config_EMG['batch_size'], shuffle=False)
     test_loss, test_accuracy, y_true, y_pred = evaluate_EMG_cnn(model, validation_loader, criterion)
-    plot_confusion_matrix(y_true, y_pred)
+    #plot_confusion_matrix(y_true, y_pred)
     #print_classification_report(y_true, y_pred)
     return model
 
