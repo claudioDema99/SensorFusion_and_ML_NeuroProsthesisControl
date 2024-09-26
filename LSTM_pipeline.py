@@ -271,7 +271,7 @@ def pipeline_lstm(dataset_name, label_name, num_classes):
     train_data, val_data = train_val_dataset_and_log(windows=windows, labels=label, wandb_enabled=False, wandb_project="SL_multiclass")
     train_config = {"batch_size": 32,
                     "epochs": 32,
-                    "criterion": "bce_with_logits",
+                    "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
     # Create data loaders
@@ -307,7 +307,7 @@ def pipeline_raw_IMU_lstm(dataset_name, label_name, num_classes):
     train_data, val_data = train_val_dataset_raw_imu(windows=windows, labels=label)
     train_config = {"batch_size": 32,
                     "epochs": 5,
-                    "criterion": "bce_with_logits",
+                    "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
     # Create data loaders
@@ -352,7 +352,7 @@ def pipeline_EMG_lstm(dataset_name, label_name, num_classes):
     train_config_EMG = {
         "batch_size": 128,
         "epochs": 5,
-        "criterion": "bce_with_logits",
+        "criterion": "",
         "optimizer": "adam",
         "learning_rate": 0.001} 
     train_loader = DataLoader(train_data, train_config_EMG['batch_size'], shuffle=True)
@@ -379,7 +379,7 @@ torch.save(trained_model_raw_imu_lstm.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 4
+global_epochs = 64
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -388,8 +388,8 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [128, 64, 64],
-        'hidden_sizes_imu': [128, 64, 64],
+        'hidden_sizes_emg': [32, 64, 128],
+        'hidden_sizes_imu': [32, 64, 128],
         #'hidden_sizes_emg': [256, 512, 256],
         #'hidden_sizes_imu': [256, 512, 256],
         'input_shape_emg': num_emg_channels * 4,#(num_emg_channels, 4),
@@ -410,7 +410,7 @@ def pipeline_lstm_from_online(emg, imu, label, num_classes, model_path=None, sav
         model.load_state_dict(torch.load(model_path))
     train_config = {"batch_size": 32,
                     "epochs": global_epochs,
-                    "criterion": "bce_with_logits",
+                    "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
     # Create data loaders
@@ -441,10 +441,10 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [128, 64, 32],
-        'hidden_sizes_imu': [128, 64, 32],
-        #'hidden_sizes_emg': [512, 512, 512],
-        #'hidden_sizes_imu': [512, 512, 512],
+        'hidden_sizes_emg': [32, 64, 128],
+        'hidden_sizes_imu': [32, 64, 128],
+        #'hidden_sizes_emg': [512, 512, 512, 512]*4,
+        #'hidden_sizes_imu': [512, 512, 512, 512]*4,
         'input_shape_emg': num_emg_channels * 4,#num_emg_channels*4,
         'input_shape_imu': 18,
         'dropout_rate': 0.1
@@ -463,7 +463,7 @@ def pipeline_raw_IMU_lstm_from_online(emg, imu, label, num_classes, model_path=N
         model.load_state_dict(torch.load(model_path))
     train_config = {"batch_size": 32,
                     "epochs": global_epochs,
-                    "criterion": "bce_with_logits",
+                    "criterion": "",
                     "optimizer": "adam",
                     "learning_rate": 0.001} #0.05
     # Create data loaders
@@ -503,7 +503,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [128, 128, 64],
+        'hidden_sizes_emg': [64, 128, 64],
         #'hidden_sizes_emg': [256, 512, 256],
         'input_shape_emg': num_emg_channels * 4,#(num_emg_channels, 4),
         'dropout_rate': 0.1
@@ -520,7 +520,7 @@ def pipeline_EMG_lstm_from_online(emg, label, num_classes, model_path=None, save
     train_config_EMG = {
         "batch_size": 32,
         "epochs": global_epochs,
-        "criterion": "bce_with_logits",
+        "criterion": "",
         "optimizer": "adam",
         "learning_rate": 0.001} 
     train_loader = DataLoader(train_data, train_config_EMG['batch_size'], shuffle=True)

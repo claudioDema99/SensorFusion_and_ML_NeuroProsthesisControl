@@ -400,7 +400,7 @@ torch.save(trained_model_raw_imu.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 4
+global_epochs = 64
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -454,8 +454,8 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
         'num_classes': num_classes,
         'hidden_sizes_emg': [256, 256, 256],
         'hidden_sizes_imu': [256, 256, 256],
-        #'hidden_sizes_emg': [1024, 1024, 1024, 1024, 1024],
-        #'hidden_sizes_imu': [1024, 1024, 1024, 1024, 1024],
+        #'hidden_sizes_emg': [2048, 2048, 2048, 2048, 2048],
+        #'hidden_sizes_imu': [2048, 2048, 2048, 2048, 2048],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 18, #9
         'dropout_rate': 0.1
@@ -468,7 +468,7 @@ def pipeline_raw_IMU_from_online(emg, imu, label, num_classes, model_path=None, 
                     "epochs": global_epochs,
                     "criterion": "",
                     "optimizer": "adam",
-                    "learning_rate": 0.001} #0.05
+                    "learning_rate": 0.01} #0.05
     # Create data loaders
     trained_model = train_and_log(train_config=train_config, model_config=config, training_dataset=training_dataset, model=model, wandb_enabled=False, wandb_project=None)
     # Evaluate the model on validation set
@@ -504,7 +504,7 @@ def pipeline_EMG_from_online(emg, label, num_classes, model_path=None, save=Fals
     val_data = TensorDataset(emg_val, labels_val)
     config_EMG = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [512, 256, 256, 256],
+        'hidden_sizes_emg': [256, 512, 256, 256],
         #'hidden_sizes_emg': [512, 1024, 1024, 1024, 512],
         'input_shape_emg': (num_emg_channels, 4),
         'dropout_rate': 0.1
@@ -697,6 +697,7 @@ np.savez("temp/current_data_emg.npz", **current_data_emg)
 
 number_rec_per_input_type = 2
 participant_folders = ["1_30_08", "2_30_08", "3_30_08", "1_31_08", "2_31_08", "3_31_08", "1_02_09", "2_02_09", "1_04_09", "2_04_09", "3_04_09", "1_05_09", "2_05_09", "3_05_09", "1_06_09"]
+participant_folders_with_raw_dataset = ["2_02_09", "1_04_09", "2_04_09", "3_04_09", "1_05_09", "2_05_09", "3_05_09", "1_06_09"]
 
 for participant_folder in participant_folders:
     data = {'emg_angles': [], 'imu_angles': [], 'label_angles': [], 

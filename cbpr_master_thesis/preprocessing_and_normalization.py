@@ -55,7 +55,7 @@ def notch_filter(signal_data, notch_frequency, Q, sampling_frequency=2000):
         filtered_signal.append(channels)
     return filtered_signal
 
-def normalize_EMG_all_channels(dataset, max_values = None):
+def normalize_EMG_all_channels(dataset, max_values = None, save=False):
     channel_max = np.full(num_emg_channels, -np.inf)
     #channel_min = np.full(11, np.inf)
     data = np.array(dataset)
@@ -76,9 +76,10 @@ def normalize_EMG_all_channels(dataset, max_values = None):
                 normalized_channel = np.zeros(channel.shape)
             channels.append(normalized_channel)
         normalized_data.append(np.array(channels))
-    # Save the max values for each channel
-    print("Max EMG values saved")
-    np.save('params/max_emg.npy', channel_max)
+    if save:
+        # Save the max values for each channel
+        print("Max EMG values saved")
+        np.save('params/max_emg.npy', channel_max)
     return normalized_data
 
 def normalize_angles(imu_dataset):
@@ -88,7 +89,7 @@ def normalize_angles(imu_dataset):
         window[:] = window / 180.0
     return imu_dataset
 
-def normalize_raw_imu(data):
+def normalize_raw_imu(data, save=False):
     if len(data.shape) == 3:
         # Normalize each channel
         # Compute the mean and standard deviation for each channel
@@ -98,15 +99,16 @@ def normalize_raw_imu(data):
         std = np.where(std == 0, 1, std)
         # Apply Z-score normalization
         normalized_data = (data - mean) / std
-        # Store the mean and standard deviation for each channel
-        print("Mean and std saved")
-        np.save('params/mean_raw_imu.npy', mean)
-        np.save('params/std_raw_imu.npy', std)
     elif len(data.shape) == 2:
         mean = np.mean(data, axis=1, keepdims=True)
         std = np.std(data, axis=1, keepdims=True)
         std = np.where(std == 0, 1, std)
         normalized_data = (data - mean) / std
+    if save:
+        # Save the mean and standard deviation for each channel
+        print("Mean and std saved")
+        np.save('params/mean_raw_imu.npy', mean)
+        np.save('params/std_raw_imu.npy', std)
     return normalized_data
 
 def save_max_emg_values(dataset):

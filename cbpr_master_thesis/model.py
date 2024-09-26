@@ -15,7 +15,7 @@ num_emg_channels = 9
 class MyMultimodalNetworkLSTM(nn.Module):
     def __init__(self, input_shape_emg, input_shape_imu, num_classes, hidden_sizes_emg, hidden_sizes_imu, dropout_rate, raw_imu=None, squeeze=None):
         super(MyMultimodalNetworkLSTM, self).__init__()
-        self.timesteps = 10  # Number of timesteps for sliding window
+        self.timesteps = 4  # Number of timesteps for sliding window
         self.emg_input_shape = input_shape_emg# * self.timesteps
         self.imu_input_shape = input_shape_imu# * self.timesteps
         self.num_classes = num_classes
@@ -137,7 +137,7 @@ def train_lstm(model, train_loader, criterion, optimizer, epochs):
             # Convert labels to float for BCEWithLogitsLoss
             label = label.float()
 
-            # Compute loss (BCEWithLogitsLoss expects float inputs)
+            # Compute loss (CrossEntropyLoss expects class indices, not one-hot encoded)
             loss = criterion(outputs, label)
 
             # Backpropagation and optimization
@@ -147,13 +147,14 @@ def train_lstm(model, train_loader, criterion, optimizer, epochs):
             # Accumulate loss
             running_loss += loss.item()
 
-            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
-            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
-            correct += (predicted == label).sum().item()
-            total += label.size(0) * label.size(1)  # Multi-label, so account for each class
+            # Calculate accuracy
+            _, predicted = torch.max(outputs, 1)
+            _, label_idx = torch.max(label, 1)
+            correct += (predicted == label_idx).sum().item()
+            total += label_idx.size(0)
 
             # Exact match ratio calculation (all labels must match)
-            exact_matches += (predicted == label).all(dim=1).sum().item()
+            exact_matches += (predicted == label_idx).all(dim=0).sum().item()
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -189,7 +190,8 @@ def evaluate_lstm(model, val_loader, criterion):
             #labels_idx = torch.argmax(label, dim=label.dim()-1)
             #_, predicted = torch.max(outputs, 1)
             # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
-            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
+            _, predicted = torch.max(outputs, 1)
+            _, label_idx = torch.max(label, 1)
             # for storing all predictions and inputs
             prediction.extend(predicted.cpu().numpy())
             emg_data.extend(emg.cpu().numpy())
@@ -200,8 +202,8 @@ def evaluate_lstm(model, val_loader, criterion):
             else:
                 labels_data.append(label.cpu().numpy())
                 y_true.append(label.cpu().numpy())
-            total += label.size(0) * label.size(1)
-            correct += (predicted == label).sum().item()
+            total += label_idx.size(0)
+            correct += (predicted == label_idx).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
@@ -218,7 +220,7 @@ def inference_lstm(model, emg_input, imu_input):
 class MyNetworkLSTM(nn.Module):
     def __init__(self, input_shape_emg, num_classes, hidden_sizes_emg, dropout_rate):
         super(MyNetworkLSTM, self).__init__()
-        self.timesteps = 10  # Number of timesteps for sliding window
+        self.timesteps = 4  # Number of timesteps for sliding window
         self.emg_input_shape = input_shape_emg# * self.timesteps
         self.num_classes = num_classes
         self.hidden_sizes_emg = hidden_sizes_emg
@@ -309,13 +311,14 @@ def train_EMG_lstm(model, train_loader, criterion, optimizer, epochs):
             # Accumulate loss
             running_loss += loss.item()
 
-            # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
-            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
-            total += label.size(0) * label.size(1)
-            correct += (predicted == label).sum().item()
+            # Calculate accuracy
+            _, predicted = torch.max(outputs, 1)
+            _, label_idx = torch.max(label, 1)
+            correct += (predicted == label_idx).sum().item()
+            total += label_idx.size(0)
 
             # Exact match ratio calculation
-            exact_matches += (predicted == label).sum().item() == label.size(0)
+            exact_matches += (predicted == label_idx).all(dim=0).sum().item()
 
         # Compute average loss and accuracy
         train_loss = running_loss / len(train_loader)
@@ -349,7 +352,8 @@ def evaluate_EMG_lstm(model, val_loader, criterion):
             loss = criterion(outputs, label)
             running_loss += loss.item()
             # Calculate accuracy (for multi-label, use thresholding like 0.5 to classify)
-            predicted = torch.sigmoid(outputs) >= 0.5  # Apply threshold to get binary predictions (0 or 1)
+            _, predicted = torch.max(outputs, 1)
+            _, label_idx = torch.max(label, 1)
             # for storing all predictions and inputs
             prediction.extend(predicted.cpu().numpy())
             emg_data.extend(emg.cpu().numpy())
@@ -359,8 +363,8 @@ def evaluate_EMG_lstm(model, val_loader, criterion):
             else:
                 labels_data.append(label.cpu().numpy())
                 y_true.append(label.cpu().numpy())
-            total += label.size(0) * label.size(1)
-            correct += (predicted == label).sum().item()
+            total += label_idx.size(0)
+            correct += (predicted == label_idx).sum().item()
             y_pred.extend(predicted.cpu().numpy())
     val_loss = running_loss / len(val_loader)
     val_accuracy = correct / total
@@ -411,6 +415,8 @@ class MyMultimodalNetworkCNN(nn.Module):
             if imu_output_size > 1:
                 imu_output_size = imu_output_size // 2
         # Flattened Size Calculation
+        #print(f'emg hidden sizes {self.hidden_sizes_emg[-1]}, emg output size {emg_output_size}')
+        #print(f'imu hidden sizes {self.hidden_sizes_imu[-1]}, imu output size {imu_output_size}')
         emg_flattened_size = self.hidden_sizes_emg[-1] * emg_output_size  # Flattened size from EMG CNN path
         imu_flattened_size = self.hidden_sizes_imu[-1] * imu_output_size  # Flattened size from IMU CNN path
 
@@ -433,6 +439,8 @@ class MyMultimodalNetworkCNN(nn.Module):
         # Flatten outputs
         emg = emg.view(emg.size(0), -1)  # Flatten the EMG output
         imu = imu.view(imu.size(0), -1)  # Flatten the IMU output
+        #print(f'emg size after flattening {emg.size()}')
+        #print(f'imu size after flattening {imu.size()}')
 
         # Concatenate EMG and IMU outputs
         concat_out = torch.cat((emg, imu), dim=1)
@@ -441,6 +449,76 @@ class MyMultimodalNetworkCNN(nn.Module):
         output = self.fc_concat(concat_out)
         output = self.dropout(output)
         return output
+
+'''
+class MyMultimodalNetworkCNN(nn.Module):
+    def __init__(self, input_shape_emg, input_shape_imu, num_classes, hidden_sizes_emg, hidden_sizes_imu, dropout_rate):
+        super(MyMultimodalNetworkCNN, self).__init__()
+        self.emg_input_shape = input_shape_emg  # (9, 4)
+        self.imu_input_shape = input_shape_imu  # 9 IMU features
+        self.num_classes = num_classes
+        self.hidden_sizes_emg = hidden_sizes_emg
+        self.hidden_sizes_imu = hidden_sizes_imu
+        self.dropout_rate = dropout_rate
+
+        # EMG pathway using CNN
+        self.emg_conv_layers = nn.ModuleList()
+        self.emg_pool = nn.MaxPool1d(kernel_size=2, stride=1)
+        emg_input_channels = self.emg_input_shape[1]  # 9 EMG channels
+        emg_output_size = self.emg_input_shape[0]  # 4 features per channel
+        for emg_hidden_size in self.hidden_sizes_emg:
+            self.emg_conv_layers.append(nn.Conv1d(emg_input_channels, emg_hidden_size, kernel_size=3, padding=1))
+            emg_input_channels = emg_hidden_size
+            emg_output_size = max(emg_output_size - 2 + 1, 1)  # Adjust based on kernel size and padding
+            if emg_output_size > 1:
+                emg_output_size = emg_output_size // 2  # Apply pooling size reduction
+
+        # IMU pathway using CNN
+        self.imu_conv_layers = nn.ModuleList()
+        self.imu_pool = nn.MaxPool1d(kernel_size=2, stride=1)
+        imu_input_channels = 1  # Treat IMU as 1 channel
+        imu_output_size = self.imu_input_shape  # 9 IMU features
+        for imu_hidden_size in self.hidden_sizes_imu:
+            self.imu_conv_layers.append(nn.Conv1d(imu_input_channels, imu_hidden_size, kernel_size=3, padding=1))
+            imu_input_channels = imu_hidden_size
+            imu_output_size = max(imu_output_size - 2 + 1, 1)  # Adjust based on kernel size and padding
+            if imu_output_size > 1:
+                imu_output_size = imu_output_size // 2  # Apply pooling size reduction
+
+        # Calculate flattened sizes
+        emg_flattened_size = self.hidden_sizes_emg[-1] * emg_output_size  # Final flattened size for EMG path
+        imu_flattened_size = self.hidden_sizes_imu[-1] * imu_output_size  # Final flattened size for IMU path
+
+        # Fully connected layer for concatenation
+        fc_input_size = emg_flattened_size + imu_flattened_size  # Combine EMG and IMU flattened sizes
+        self.fc_concat = nn.Linear(fc_input_size, self.num_classes)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, emg, imu):
+        # Transpose EMG input to have shape [batch_size, num_channels, sequence_length]
+        emg = emg.transpose(1, 2)  # Shape becomes [32, 4, 9]
+
+        # EMG Pathway
+        for emg_conv in self.emg_conv_layers:
+            emg = self.emg_pool(F.relu(emg_conv(emg)))  # Apply Conv + Pool
+
+        # IMU Pathway
+        imu = imu.unsqueeze(1)  # Add channel dimension: shape becomes [32, 1, 9]
+        for imu_conv in self.imu_conv_layers:
+            imu = self.imu_pool(F.relu(imu_conv(imu)))  # Apply Conv + Pool
+
+        # Flatten the outputs
+        emg = emg.view(emg.size(0), -1)  # Flatten EMG output to [32, emg_flattened_size]
+        imu = imu.view(imu.size(0), -1)  # Flatten IMU output to [32, imu_flattened_size]
+
+        # Concatenate EMG and IMU outputs
+        concat_out = torch.cat((emg, imu), dim=1)
+
+        # Fully connected layer
+        output = self.fc_concat(concat_out)
+        output = self.dropout(output)
+        return output
+'''
 
 def train_cnn(model, train_loader, criterion, optimizer, epochs):
     model.train()

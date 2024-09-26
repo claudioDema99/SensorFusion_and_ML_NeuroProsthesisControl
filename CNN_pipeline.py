@@ -374,7 +374,7 @@ torch.save(trained_model_raw_imu_cnn.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 4
+global_epochs = 64
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -383,10 +383,12 @@ def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [256, 128, 128],
-        'hidden_sizes_imu': [256, 128, 128],
-        #'hidden_sizes_emg': [512, 1024, 512],
-        #'hidden_sizes_imu': [512, 1024, 512],
+        'hidden_sizes_emg': [32, 64, 128],
+        'hidden_sizes_imu': [32, 64, 128],
+        #'hidden_sizes_emg': [256, 128, 128],
+        #'hidden_sizes_imu': [256, 128, 128],
+        #'hidden_sizes_emg': [1024, 1024, 1024],
+        #'hidden_sizes_imu': [1024, 1024, 1024],
         'input_shape_emg': (num_emg_channels, 4),
         'input_shape_imu': 9,
         'dropout_rate': 0.1
@@ -434,8 +436,10 @@ def pipeline_raw_IMU_cnn_from_online(emg, imu, label, num_classes, model_path=No
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [256, 128, 128],
-        'hidden_sizes_imu': [256, 128, 128],
+        'hidden_sizes_emg': [32, 64, 128],
+        'hidden_sizes_imu': [32, 64, 128],
+        #'hidden_sizes_emg': [256, 128, 128],
+        #'hidden_sizes_imu': [256, 128, 128],
         #'hidden_sizes_emg': [1024, 1024, 1024],
         #'hidden_sizes_imu': [1024, 1024, 1024],
         'input_shape_emg': (num_emg_channels, 4),
@@ -495,8 +499,9 @@ def pipeline_EMG_cnn_from_online(emg, label, num_classes, model_path=None, save=
     # Configuration dictionary
     config = {
         'num_classes': num_classes,
-        'hidden_sizes_emg': [256, 256, 128],
-        #'hidden_sizes_emg': [512, 1024, 512],
+        'hidden_sizes_emg': [32, 64, 128],
+        #'hidden_sizes_emg': [256, 256, 128],
+        #'hidden_sizes_emg': [1024, 1024, 1024],
         'input_shape_emg': (num_emg_channels, 4),
         'dropout_rate': 0.1
     }

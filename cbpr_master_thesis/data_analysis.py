@@ -16,8 +16,8 @@ from cbpr_master_thesis.feature_extraction import extract_EMG_features, create_w
 
 #%% NORMALIZATION PARAMS
 
-def store_normalization_params():
-    file_path = "C:/Users/claud/Desktop/raw_dataset.npz"
+def store_normalization_params(participant_folder):
+    file_path = "C:/Users/claud/Desktop/CBPR_Recording_Folders/" + participant_folder + "/raw_dataset_1.npz"
     dataset = np.load(file_path, allow_pickle=True)
     emg, imu = (dataset['emg'], dataset['imu'])
     emg = emg.reshape(9, 100*emg.shape[0]) # 11
@@ -37,9 +37,9 @@ def store_normalization_params():
     label = np.array([1])
     windows, label = create_windows(data, window_length, overlap, label)
     windows = windows.squeeze()
-    imu_vector = normalize_raw_imu(windows[:,11:,:])
+    imu_vector = normalize_raw_imu(windows[:,11:,:], save=True)
     # Compute the mean across windows and samples for each channel
-    emg_vector = np.array(normalize_EMG_all_channels(extract_EMG_features(windows)))
+    emg_vector = np.array(normalize_EMG_all_channels(extract_EMG_features(windows)), save=True)
     return
 
 #store_normalization_params()
@@ -408,32 +408,35 @@ def plot_f1_scores_barchart(metrics_df, model_type):
     # Filter data for the specified model type
     filtered_df = metrics_df[metrics_df['Model'] == model_type]
     
+    # Initialize a list to hold F1-scores for all classes and input types
+    f1_data = []
+    
     # Iterate over the unique input types (EMG, Angles, IMU)
     for input_type in filtered_df['Data_Type'].unique():
         # Filter data for each input type
         class_f1_df = filtered_df[filtered_df['Data_Type'] == input_type]
         
         # Extract F1-scores for each class
-        f1_data = []
         for i in range(5):  # Assuming you have 5 classes (0, 1, 2, 3, 4)
             class_column = 'F1-Score'
             if class_column in class_f1_df.columns:
                 f1_score = class_f1_df[class_column].values[0]  # Get the F1-score for class i
-                f1_data.append({'Class': f'Class {i}', 'F1-Score': f1_score})
+                f1_data.append({'Class': f'Class {i}', 'F1-Score': f1_score, 'Input_Type': input_type})
             else:
                 print(f'Column {class_column} not found in DataFrame')
+    
+    # Convert the list to a DataFrame
+    f1_df = pd.DataFrame(f1_data)
 
-        # Convert the list to a DataFrame
-        f1_df = pd.DataFrame(f1_data)
-
-        # Create bar plot for F1-score for each class
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Class', y='F1-Score', data=f1_df)
-        plt.title(f'{model_type} - F1-scores for Each Class ({input_type})')
-        plt.ylabel('F1-Score')
-        plt.ylim(0, 1)
-        plt.xlabel('Class')
-        plt.show()
+    # Create grouped bar plot for F1-scores for each class and input type
+    plt.figure(figsize=(12, 8))
+    sns.barplot(x='Class', y='F1-Score', hue='Input_Type', data=f1_df)
+    plt.title(f'{model_type} - F1-scores for Each Class (Grouped by Input Type)')
+    plt.ylabel('F1-Score')
+    plt.ylim(0, 1)
+    plt.xlabel('Class')
+    plt.legend(title='Input Type')
+    plt.show()
 
 '''
 # Example usage for FFNN, CNN, and LSTM
