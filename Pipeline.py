@@ -22,8 +22,7 @@ import pandas as pd
 from cbpr_master_thesis.preprocessing_and_normalization import notch_filter, bandpass_filter, highpass_filter, lowpass_filter, normalize_EMG_all_channels, convert_to_SI, save_max_emg_values, normalize_raw_imu
 from cbpr_master_thesis.feature_extraction import create_windows, get_new_feature_vector, extract_EMG_features, extract_quaternions, extract_quaternions_new, extract_angles_from_rot_matrix
 from cbpr_master_thesis.model import MyMultimodalNetwork, MyEMGNetwork, train_EMG, test_EMG, get_tensor_dataset, train_multiclass, test_multiclass, test_and_storing, test_EMG_and_storing
-from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance, data_analysis, plot_accuracy_boxplots, plot_performance_lineplot, plot_f1_scores_barchart, comparison_analysis, plot_heatmap, bar_chart_with_error_bars
-
+from cbpr_master_thesis.data_analysis import undersample_majority_class_first_n, extract_and_balance, data_analysis, plot_accuracy_boxplots, plot_performance_lineplot, plot_f1_scores_barchart, comparison_analysis, plot_heatmap, bar_chart_with_error_bars, sum_confusion_matrices, plot_confusion_matrices
 DEFAULT_RANDOM_SEED = 0
 
 if torch.cuda.is_available():
@@ -400,7 +399,7 @@ torch.save(trained_model_raw_imu.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 64
+global_epochs = 4
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -734,4 +733,7 @@ accuracy_matrix = data.pivot_table(values='Accuracy',
 plot_heatmap(accuracy_matrix)
 # Call the function
 bar_chart_with_error_bars(data)
-# %%
+# %% CONFUSION MATRICES
+
+result = sum_confusion_matrices(confusion_matrices, participant_folders)
+plot_confusion_matrices(result)

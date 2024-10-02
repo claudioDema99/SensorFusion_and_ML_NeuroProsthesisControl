@@ -2,9 +2,10 @@
 from typing import List
 import os
 import numpy as np
+from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score, classification_report
 import pandas as pd
 from scipy import signal
 import pickle
@@ -386,6 +387,8 @@ def plot_accuracy_boxplots(metrics_df, model_type):
     plt.title(f'Accuracy Distribution for {model_type}')
     plt.ylabel('Accuracy')
     plt.xlabel('Input Type')
+    # save the plot
+    plt.savefig(f"{model_type}_accuracy_boxplot.png")
     plt.show()
 
 def plot_performance_lineplot(metrics_df, model_type):
@@ -402,6 +405,8 @@ def plot_performance_lineplot(metrics_df, model_type):
     plt.ylabel('Metric Value')
     plt.xlabel('Input Type')
     plt.legend(title='Metrics')
+    # save the plot
+    plt.savefig(f"{model_type}_performance_lineplot.png")
     plt.show()
 
 def plot_f1_scores_barchart(metrics_df, model_type):
@@ -436,6 +441,8 @@ def plot_f1_scores_barchart(metrics_df, model_type):
     plt.ylim(0, 1)
     plt.xlabel('Class')
     plt.legend(title='Input Type')
+    # save the plot
+    plt.savefig(f"{model_type}_f1_scores_barchart.png")
     plt.show()
 
 '''
@@ -484,6 +491,8 @@ def comparison_analysis(metrics_df):
     # Create a line plot to show interaction between factors
     sns.pointplot(x='Input_Modality', y='Accuracy', hue='Classification_Method', data=data, dodge=True, markers=["o", "s", "D"], linestyles=["-", "--", ":"])
     plt.title('Interaction Plot: Accuracy by Classification Method and Input Modality')
+    # save the plot
+    plt.savefig("interaction_plot.png")
     plt.show()
     return data
 
@@ -494,6 +503,8 @@ def plot_heatmap(accuracy_matrix):
     plt.title('Heatmap: Accuracy Across Classification Methods and Input Modalities')
     plt.xlabel('Input Modality')
     plt.ylabel('Classification Method')
+    # save the plot
+    plt.savefig("heatmap.png")
     plt.show()
 
 # Bar Plot for Mean Accuracy with Error Bars (Standard Deviation)
@@ -509,6 +520,8 @@ def bar_chart_with_error_bars(data):
     plt.ylabel('Mean Accuracy')
     plt.xlabel('Classification Method')
     plt.legend(title='Input Modality')
+    # save the plot
+    plt.savefig("bar_chart.png")
     plt.show()
 
 '''
@@ -528,3 +541,36 @@ def interaction_plot(data):
     plt.legend(title='Classification Method')
     plt.show()
 '''
+def sum_confusion_matrices(data, participant_list):
+    # Dictionary to store summed confusion matrices
+    summed_matrices = defaultdict(lambda: np.zeros((5, 5), dtype=int))  # 5x5 integer matrices
+
+    for key, matrix in data.items():
+        # Split the key into its components
+        parts = key.split('_')
+        if len(parts) < 5:
+            continue  # Skip invalid keys
+        
+        participant = '_'.join(parts[:3])
+        model_type = parts[-2]
+        input_type = parts[-1]
+        
+        # Check if the participant is in our list
+        if participant in participant_list:
+            # Create a new key with just model_type and input_type
+            new_key = f"{model_type}_{input_type}"
+            # Sum the matrices
+            summed_matrices[new_key] += np.array(matrix)
+
+    return dict(summed_matrices)
+
+def plot_confusion_matrices(summed_matrices):
+    class_names = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5']
+
+    for key, matrix in summed_matrices.items():
+        plt.figure(figsize=(10, 8))
+        disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=class_names)
+        disp.plot(values_format='d', cmap='Blues')
+        plt.title(f'Confusion Matrix: {key}')
+        plt.tight_layout()
+        plt.show()

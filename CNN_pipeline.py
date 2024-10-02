@@ -374,7 +374,7 @@ torch.save(trained_model_raw_imu_cnn.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 64
+global_epochs = 4
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_cnn_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
