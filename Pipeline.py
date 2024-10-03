@@ -399,7 +399,7 @@ torch.save(trained_model_raw_imu.state_dict(), model_path)
 #%% Pipeline from online recordings
 
 num_emg_channels = 9
-global_epochs = 4
+global_epochs = 64
 base_folder = "C:/Users/claud/Desktop/CBPR_Recordings/"
 
 def pipeline_from_online(emg, imu, label, num_classes, model_path=None, save=False, model_path_save=None, participant_folder=None):
@@ -733,7 +733,99 @@ accuracy_matrix = data.pivot_table(values='Accuracy',
 plot_heatmap(accuracy_matrix)
 # Call the function
 bar_chart_with_error_bars(data)
-# %% CONFUSION MATRICES
-
+# CONFUSION MATRICES
 result = sum_confusion_matrices(confusion_matrices, participant_folders)
 plot_confusion_matrices(result)
+
+#%% 5-FOLD CROSS VALIDATION
+
+# load input angles data of each participant and store in a list (of dict)
+dataset = []
+number_rec_per_input_type = 2
+participant_folders = ["1_30_08", "2_30_08", "3_30_08", "1_31_08", "2_31_08", "3_31_08", "1_02_09", "2_02_09", "1_04_09", "2_04_09", "3_04_09", "1_05_09", "2_05_09", "3_05_09", "1_06_09"]
+participant_folders_with_raw_dataset = ["2_02_09", "1_04_09", "2_04_09", "3_04_09", "1_05_09", "2_05_09", "3_05_09", "1_06_09"]
+for participant_folder in participant_folders:
+    data_full = {'emg_angles': [], 'imu_angles': [], 'label_angles': [], 
+            'emg_raw_imu': [], 'imu_raw_imu': [], 'label_raw_imu': [], 
+            'emg_emg': [], 'imu_emg': [], 'label_emg': []}
+    data_full = extract_and_balance(participant_folder, number_rec_per_input_type)
+    data = {}
+    data['emg_angles'] = data_full['emg_angles']
+    data['imu_angles'] = data_full['imu_angles']
+    data['label_angles'] = data_full['label_angles']
+    if data['emg_angles'].shape[1] == 11:
+        data['emg_angles'] = np.delete(data['emg_angles'], [0, 6], axis=1)
+    dataset.append(data)
+
+from sklearn.model_selection import KFold
+
+kf = KFold(n_splits=5, shuffle=True, random_state=42)  # Shuffle ensures different splits, random_state ensures reproducibility
+
+# Prepare for cross-validation
+for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+    print(f"Fold {fold + 1}:")
+    
+    # Split data into training and testing sets
+    train_data = [dataset[i] for i in train_idx]
+    test_data = [dataset[i] for i in test_idx]
+    
+    # Concatenate the training and testing data
+    X_train_emg = np.concatenate([data['emg_angles'] for data in train_data], axis=0)
+    X_train_imu = np.concatenate([data['imu_angles'] for data in train_data], axis=0)
+    y_train = np.concatenate([data['label_angles'] for data in train_data], axis=0)
+    
+    X_test_emg = np.concatenate([data['emg_angles'] for data in test_data], axis=0)
+    X_test_imu = np.concatenate([data['imu_angles'] for data in test_data], axis=0)
+    y_test = np.concatenate([data['label_angles'] for data in test_data], axis=0)
+
+    # Print shapes to verify the splits
+    print(f"Train EMG shape: {X_train_emg.shape}, IMU shape: {X_train_imu.shape}, Label shape: {y_train.shape}")
+    print(f"Test EMG shape: {X_test_emg.shape}, IMU shape: {X_test_imu.shape}, Label shape: {y_test.shape}")
+    
+    # Here you would train your multimodal network using X_train_emg, X_train_imu, and y_train
+    # model.fit([X_train_emg, X_train_imu], y_train)
+    # Then evaluate it on the test set
+    # predictions = model.predict([X_test_emg, X_test_imu])
+    # Evaluate the results, e.g., accuracy, loss, etc.
+
+    #emg, imu, label, pred = load_data_from_online(dataset_name)
+    training_dataset = TensorDataset(torch.tensor(np.array(X_train_emg), dtype=torch.float32), torch.tensor(np.array(X_train_imu), dtype=torch.float32), torch.tensor(np.array(y_train), dtype=torch.long))
+    validation_dataset = TensorDataset(torch.tensor(np.array(X_test_emg), dtype=torch.float32), torch.tensor(np.array(X_test_imu), dtype=torch.float32), torch.tensor(np.array(y_test), dtype=torch.long))
+    config = {
+        'num_classes': 5,
+        'hidden_sizes_emg': [256, 256, 256],
+        'hidden_sizes_imu': [256, 256, 256],
+        #'hidden_sizes_emg': [512, 1024, 1024, 1024, 512],
+        #'hidden_sizes_imu': [512, 1024, 1024, 1024, 512],
+        'input_shape_emg': (9, 4),
+        'input_shape_imu': 9, #9
+        'dropout_rate': 0.1
+    }
+    model = build_model_and_log(config, wandb_enabled=False, wandb_project="SL_multiclass")
+    #batch_size ???
+    train_config = {"batch_size": 32,
+                    "epochs": 64, #256 -> 99.5%
+                    "criterion": "",
+                    "optimizer": "adam",
+                    "learning_rate": 0.001} #0.05
+    # or weighted BCE
+    trained_model = train_and_log(train_config, config, training_dataset=training_dataset, model=model, wandb_enabled=False, wandb_project="SL_multiclass")
+    #test_accuracy, y_true, y_pred, all_predictions = evaluate_and_log(train_config, validation_dataset, trained_model, wandb_project="SL_multiclass")
+    validation_loader = DataLoader(validation_dataset, batch_size=train_config['batch_size'])
+    test_accuracy, y_true, y_pred, emg_data, imu_data, label_data, predictions = test_and_storing(model, validation_loader)
+    '''
+    directory = base_folder + participant_folder
+    file_name = "ffnn_angles_dataset.npz"
+    file_path = os.path.join(directory, file_name) if directory else file_name
+    data_dict = {
+        'emg': np.array(emg_data),
+        'imu': np.array(imu_data),
+        'label': np.array(label_data),
+        'prediction': np.array(predictions)
+    }
+    # WAIT FOR SAVE THE DATA
+    np.savez(file_path, **data_dict)
+    '''
+    #######################################################################################
+
+# %%

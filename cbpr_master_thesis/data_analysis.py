@@ -524,23 +524,6 @@ def bar_chart_with_error_bars(data):
     plt.savefig("bar_chart.png")
     plt.show()
 
-'''
-# Interaction Plot for Accuracy by Classification Method and Input Modality
-def interaction_plot(data):
-    sns.pointplot(x='Input_Modality', 
-                  y='Accuracy', 
-                  hue='Classification_Method', 
-                  data=data, 
-                  dodge=True, 
-                  markers=["o", "s", "D"], 
-                  linestyles=["-", "--", ":"],
-                  ci='sd')  # ci='sd' adds standard deviation as error bars
-    plt.title('Interaction Plot: Accuracy by Classification Method and Input Modality')
-    plt.ylabel('Mean Accuracy')
-    plt.xlabel('Input Modality')
-    plt.legend(title='Classification Method')
-    plt.show()
-'''
 def sum_confusion_matrices(data, participant_list):
     # Dictionary to store summed confusion matrices
     summed_matrices = defaultdict(lambda: np.zeros((5, 5), dtype=int))  # 5x5 integer matrices
