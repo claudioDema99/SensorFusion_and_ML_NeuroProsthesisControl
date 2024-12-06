@@ -3,6 +3,7 @@
 ## **Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data (Neuro-Prosthesis)**
 
 This project addresses the **limb position effect** in neuro-prosthesis control using EMG signals, through a **sensor-fusion algorithm** that integrates and processes **IMU data** from three sensors placed on the **wrist**, **forearm**, and **upper arm**.
+I developed a sensor fusion and machine learning algorithm to enhance the control of transradial neural prostheses during daily life activities. Specifically, I worked on a pattern recognition algorithm capable of recognizing different objects the prosthesis is grasping, based on their shape and weight, independently of arm movement and position. This included integrating an orientation estimation algorithm to determine the arm’s position in space. I conducted a study with 15 volunteer participants to evaluate the algorithm’s performance, achieving promising results that are expected to be published and presented at RehabWeek 2025 in Chicago, IL, USA.
 
 ### **Project Goal**
 
@@ -28,9 +29,7 @@ Each architecture was tested using three different input vectors:
 
 ### **Performance & Results**
 
-The **angle estimation algorithm** demonstrated **significant improvements** and **better performance** across all machine learning architectures. These results were validated through **offline experiments** with **15 volunteer participants**, providing a strong foundation for potential **future online testing**.
-
-MISSING IMAGES, MODELS, DATASET? NEED TO CHECK
+The **angle estimation algorithm** demonstrated **significant improvements** and **better performance** across all machine learning architectures. These results were validated through **offline experiments** with **15 volunteer participants**, providing a strong foundation for potential **future online testing**. ToDo
 
 ### Pipeline Scripts
 
@@ -72,5 +71,6 @@ To run the ROS2 infrastructure:
 4. In non-working mode, current predictions can be viewed by switching to working mode.
 5. For recording sessions, select "go recording" to record data, which will then be saved inside the participant's folder under the recording session number.
 6. Once at least one recording session is saved, models can be trained in training mode. A slicing panel will allow you to select which recording session to use for training.
+ToDo
 
 For further details on the motivations, background, decisions, and logic behind the project, refer to the full **Master Thesis**.
