@@ -171,7 +171,7 @@ class ParticipantInfoDialog(tk.Toplevel):
         number_recordings += 1
         
         with open(file_path, 'w') as f:
-            f.write(f"\n Models UNO DIETRO L'ALTRO DA SISTEMARE:\n")
+            f.write(f"\n Models:\n") # UNO DIETRO L'ALTRO DA SISTEMARE
             f.write(f"Model Type: {self.model_type}\n")
             f.write(f"Input Type: {self.input_type}\n")
             f.write(f"Number of Classes: {self.num_classes}\n")

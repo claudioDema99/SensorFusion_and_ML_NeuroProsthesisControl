@@ -1,6 +1,6 @@
 # CBPR_Master_Thesis
 
-## **Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data (Neuro-Prosthesis)**
+## **Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data**
 
 This project addresses the **limb position effect** in neuro-prosthesis control using EMG signals, through a **sensor-fusion algorithm** that integrates and processes **IMU data** from three sensors placed on the **wrist**, **forearm**, and **upper arm**.
 I developed a sensor fusion and machine learning algorithm to enhance the control of transradial neural prostheses during daily life activities. Specifically, I worked on a pattern recognition algorithm capable of recognizing different objects the prosthesis is grasping, based on their shape and weight, independently of arm movement and position. This included integrating an orientation estimation algorithm to determine the arm’s position in space. I conducted a study with 15 volunteer participants to evaluate the algorithm’s performance, achieving promising results that are expected to be published and presented at RehabWeek 2025 in Chicago, IL, USA.
@@ -51,7 +51,7 @@ The **ROS2** folder includes the packages for managing real-time streaming, pipe
 
 To run the ROS2 infrastructure:
 
-1. Ensure **ROS2** is installed on your Linux environment or WSL (Windows).
+1. Ensure **ROS2** is installed on your Linux environment (or WSL in Windows).
 2. Download the **ROS2** folder, and place the two packages (**delsys_pkg** and **interfaces**) into your ROS2 workspace.
 3. Open the terminal and navigate to your ROS2 workspace folder.
 4. Build the selected packages using `colcon build --packages-select delsys_pkg interfaces`.
