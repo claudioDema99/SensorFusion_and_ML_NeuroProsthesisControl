@@ -1,75 +1,157 @@
-# **Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data**
+# Sensor Fusion and Machine Learning for Neural Prosthesis Control
 
-This project addresses the **limb position effect** in neuro-prosthesis control using EMG signals, through a **sensor-fusion algorithm** that integrates and processes **IMU data** from three sensors placed on the **wrist**, **forearm**, and **upper arm**.
-I developed a sensor fusion and machine learning algorithm to enhance the control of transradial neural prostheses during daily life activities. Specifically, I worked on a pattern recognition algorithm capable of recognizing different objects the prosthesis is grasping, based on their shape and weight, independently of arm movement and position. This included integrating an orientation estimation algorithm to determine the arm’s position in space.
+**MSc thesis project (2024)** | University of Genoa and Center for Bionics and Pain Research (CBPR), Gothenburg, Sweden  
+**Author:** Claudio Demaria  
+**Thesis:** *Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data*
 
-### **Project Goal**
+## Overview
 
-The overall goal of the algorithm is to enhance **neuro-prosthesis control** during daily activities involving **object grasping** and **movement**. It achieves this by training **machine learning models** to recognize different **grasp gestures** and the **weight of objects**, independent of the arm's movement and position in space.
+This research investigates the **limb position effect** in myoelectric prosthesis control: the same intended grasp can produce different electromyography (EMG) patterns as the arm changes posture or moves under load. Models relying exclusively on EMG may therefore misclassify grasping activity across different arm positions.
 
-### **Angle Estimation Algorithm**
+I developed a sensor-fusion pipeline that combines forearm/arm **EMG** with **inertial measurement unit (IMU)** measurements. Instead of passing only raw IMU readings to the classifier, the approach estimates **nine arm-orientation angles** from the accelerometer and gyroscope signals, then combines these features with EMG. The hypothesis is that a task-relevant, physically meaningful orientation representation improves classification with compact neural networks.
 
-I developed an **angle estimation algorithm** that uses data from the **accelerometers** and **gyroscopes** to extract **9 angles** that accurately define the position of the arm in space. This is achieved using an **IMU orientation estimation with bias estimation algorithm** applied to the raw IMU data.
+The project includes the experimental ML pipelines, offline comparisons, data acquisition and preprocessing, and a **ROS2-based system for sensor streaming, recording, training, and live prediction visualization**. The research was conducted in the context of transradial prosthesis control, although the experimental participants were **15 non-amputee volunteers**.
 
-### **Machine Learning Architectures**
+> **Key result:** In the primary *offline, participant-specific* evaluation, the feedforward neural network reached **88.4% accuracy with EMG + estimated angles**, compared with **23.9% for EMG alone** and **30.0% for EMG + raw IMU**. These are not unseen-participant or deployed prosthesis performance figures.
 
-Three supervised learning architectures were tested:
+## Research question and contributions
 
-- **FFNN (Feed-Forward Neural Network)**
-- **CNN (Convolutional Neural Network)**
-- **LSTM (Long Short-Term Memory Network)**
+1. **Orientation estimation:** estimate nine arm-orientation angles using three IMUs on the wrist, forearm and upper arm, with orientation/bias estimation based on accelerometer and gyroscope signals.
+2. **Controlled input comparison:** compare EMG alone, EMG + raw IMU, and EMG + estimated angles while holding each model architecture fixed.
+3. **Architectural comparison:** evaluate feedforward neural networks (FFNN), convolutional neural networks (CNN), and long short-term memory networks (LSTM): **nine model/input configurations**.
+4. **Experimental validation:** analyze results from 15 participants, run statistical comparisons (two-way ANOVA and Tukey HSD), and test cross-participant generalization using subject-disjoint five-fold cross-validation.
+5. **Research software:** implement offline pipelines and ROS2/MATLAB integration for acquisition, synchronized data processing, storage, and model inference.
 
-Each architecture was tested using three different input vectors:
+## Experimental setup
 
-1. **Features extracted from EMG data**
-2. **EMG features combined with raw IMU data**
-3. **EMG features combined with arm angles estimated from IMU data**
+- **Participants:** 15 healthy, non-amputee volunteers.
+- **Sensors:** six EMG sensors and three IMU sensors (wrist, forearm, upper arm), acquired using the Delsys Trigno system.
+- **Task:** reaching, grasping, and moving objects with different shapes and weights: paper and ceramic plates, plus empty and water-filled bottles. A rest/no-object state was also included, yielding a five-class recognition problem.
+- **Signals:** the system handled a high-frequency stream (27 channels at 2,000 Hz, as described in the thesis).
+- **Model constraint:** the laboratory's target prosthesis had **1 MB of flash available for the embedded model**; this motivated evaluation of compact architectures. The thesis does not establish successful deployment of the trained classifier onto that prosthesis.
 
-### **Performance & Results**
+### Processing and model pipeline
 
-The **angle estimation algorithm** demonstrated **significant improvements** and **better performance** across all machine learning architectures. These results were validated through **offline experiments** with **15 volunteer participants**, providing a strong foundation for potential **future online testing**. ToDo
+```text
+Delsys Trigno: EMG + 3 IMUs
+             |
+             v
+ Acquisition / preprocessing / time windows
+             |
+       +-----+-------------------+
+       |                         |
+       v                         v
+ EMG feature extraction    IMU processing
+                             |         |
+                        Raw readings  Orientation / bias estimation
+                                         |
+                                   Nine arm angles
+       |                         |         |
+       +------------+------------+---------+
+                    |
+         Three input representations
+     (EMG / EMG+raw IMU / EMG+angles)
+                    |
+             FFNN / CNN / LSTM
+                    |
+       Offline evaluation / live inference
+```
 
-### Pipeline Scripts
+The IMU orientation features are computed before the classifier; the FFNN/CNN/LSTM models do not themselves implement the orientation-estimation algorithm.
 
-The scripts **`Pipeline`**, **`Pipeline_CNN`**, and **`Pipeline_LSTM`** are responsible for managing the entire **offline** process for each model. This includes loading datasets, preprocessing, feature extraction, inference, data analysis, and plotting. The models utilized in these scripts are found in the **`cbpr_master_thesis`** folder, specifically in the submodules: `data_analysis`, `feature_extraction`, `model`, and `preprocessing_and_normalization`. The script **`Pipeline_hyperparams`** is used for hyperparameter tuning across the various models.
+## Quantitative results
 
-### MATLAB Code
+**Primary offline evaluation: mean metrics across the 15 participants.** Values are reported in Chapter 5, Tables 5.1–5.3 of the MSc thesis.
 
-The **MATLAB** folder contains the primary MATLAB code, which is based on the **LocoD platform** with necessary modifications. This code is used for managing the acquisition of signals from the **Delsys system**, storing datasets, and streaming data to the ROS2 environment through the **MATLAB ROS2 Toolbox**.
+| Model | Inputs | Accuracy | Precision | Recall | F1-score |
+|:--|:--|--:|--:|--:|--:|
+| FFNN | EMG | 23.9% | 12.0% | 23.9% | 13.2% |
+| FFNN | EMG + raw IMU | 30.0% | 30.7% | 29.9% | 25.8% |
+| **FFNN** | **EMG + estimated angles** | **88.4%** | **88.9%** | **88.4%** | **88.4%** |
+| CNN | EMG | 22.5% | 11.4% | 22.5% | 11.2% |
+| CNN | EMG + raw IMU | 30.2% | 29.2% | 30.2% | 28.6% |
+| **CNN** | **EMG + estimated angles** | **87.6%** | **88.4%** | **87.6%** | **87.6%** |
+| LSTM | EMG | 22.1% | 8.8% | 22.1% | 11.1% |
+| LSTM | EMG + raw IMU | 34.1% | 32.1% | 34.2% | 30.1% |
+| **LSTM** | **EMG + estimated angles** | **82.0%** | **82.9%** | **82.0%** | **82.0%** |
 
-### Params Folder
+The best FFNN result represents a **64.5-percentage-point accuracy improvement** over EMG-only input. This is a comparison within the reported offline setup, not a claim of improvement on external populations or real prosthesis users.
 
-The **params** folder is used to store the parameters required for normalizing EMG and raw IMU data specific to each participant.
+Two-way ANOVA and Tukey's HSD analyses in the thesis supported the advantage of the angle-based representation across architectures. The thesis does not provide enough detail here to justify quoting exact p-values in this README.
 
-### ROS2 Folder and Infrastructure
+### Subject-independent evaluation
 
-The **ROS2** folder includes the packages for managing real-time streaming, pipelines, and inference of all models within the ROS2 environment. It also handles the storage of input vectors, predictions, and provides the ability to fine-tune models based on the stored dataset. These processes are efficiently controlled through a GUI that interacts with all the nodes, allowing users to manage the entire infrastructure.
+The thesis also evaluated the angle-based representation under **five-fold cross-validation with participants held out**: each fold trained on 12 participants and tested on the other three.
 
-### How to Run the ROS2 Infrastructure
+| Model | Mean held-out-participant accuracy (5 folds) |
+|:--|--:|
+| FFNN | 34.37% |
+| CNN | 34.96% |
+| LSTM | 32.90% |
 
-To run the ROS2 infrastructure:
+These results are substantially lower than the participant-specific offline results and highlight the difficulty of **generalizing to unseen users**. Five-class chance-level accuracy would be 20% under balanced random guessing; these figures should not be presented as a practical solution to user-independent prosthesis control.
 
-1. Ensure **ROS2** is installed on your Linux environment (or WSL in Windows).
-2. Download the **ROS2** folder, and place the two packages (**delsys_pkg** and **interfaces**) into your ROS2 workspace.
-3. Open the terminal and navigate to your ROS2 workspace folder.
-4. Build the selected packages using `colcon build --packages-select delsys_pkg interfaces`.
-5. Run the infrastructure with `ros2 launch delsys_pkg delsys_launch.py`.
+### Online / real-time performance
 
-### How to Use the System
+A ROS2 infrastructure was implemented for streaming and live inference, but the thesis reports that **online classification performance fell short of expectations**. Possible contributors include real-time noise and latency, movement variability, and limitations imposed by compact models. Accordingly, this repository represents a **research prototype**, not a clinically validated or production-ready prosthesis controller.
 
-#### Prerequisites
+## Repository structure
 
-- You need a **Delsys Trigno System** (Avanti and EMG sensors).
-  
-#### Steps
+The following paths reflect the public repository at the time this README was prepared:
 
-1. Connect the **Delsys Trigno** to your PC.
-2. Run the ROS2 infrastructure.
-3. Open the **participant panel** and create a participant folder in the filesystem.
-4. In non-working mode, current predictions can be viewed by switching to working mode.
-5. For recording sessions, select "go recording" to record data, which will then be saved inside the participant's folder under the recording session number.
-6. Once at least one recording session is saved, models can be trained in training mode. A slicing panel will allow you to select which recording session to use for training.
-ToDo
+| Path | Purpose |
+|:--|:--|
+| `Pipeline.py` | FFNN offline experiment pipeline |
+| `CNN_pipeline.py` | CNN offline experiment pipeline |
+| `LSTM_pipeline.py` | LSTM offline experiment pipeline |
+| `Pipeline_hyperparams.py` | Hyperparameter search/experiment support |
+| `cbpr_master_thesis/` | Shared Python components for preprocessing, feature extraction, models, and analysis |
+| `MATLAB/` | Adaptations to the LocoD-based acquisition/recording and MATLAB-to-ROS2 streaming logic |
+| `ROS2/` | ROS2 packages supporting data streaming, recording, inference, model management, and the GUI |
+| `params/` | Participant-specific normalization parameters |
 
-For further details on the motivations, background, decisions, and logic behind the project, refer to the full **Master Thesis**.
+The MATLAB acquisition work builds upon **LocoD**, an existing platform developed at CBPR. This repository contains project-specific modifications; it is not an original implementation of LocoD from scratch.
 
+## Running the ROS2 infrastructure
+
+> The commands below document the repository's existing workflow; I have not re-run the hardware-dependent system in a clean environment. Model artifacts, raw participant datasets, compatible software versions, and the Delsys hardware may be needed for the full workflow.
+
+1. Install a compatible ROS2 distribution and the workspace dependencies required by the repository's packages.
+2. Copy the `delsys_pkg` and `interfaces` packages from `ROS2/` into the `src/` directory of your ROS2 workspace.
+3. Build and source the workspace:
+
+   ```bash
+   cd <your-ros2-workspace>
+   colcon build --packages-select delsys_pkg interfaces
+   source install/setup.bash
+   ```
+
+4. Connect the Delsys Trigno acquisition system and configure MATLAB / the ROS2 Toolbox as required by the project's sensor streaming setup.
+5. Launch the ROS2 application:
+
+   ```bash
+   ros2 launch delsys_pkg delsys_launch.py
+   ```
+
+The GUI supports working/live-prediction, recording, and training workflows. See the thesis's Chapter 4 for the ROS2 state machine and node responsibilities.
+
+### Offline experiments
+
+The offline FFNN, CNN, and LSTM scripts load recorded data, construct the three input representations, train/evaluate models, and produce performance analysis. Inputs and dataset paths are environment-specific; consult the scripts and `params/` before running them. **No turnkey reproducibility guarantee or verified dependency lockfile is claimed here.**
+
+## Limitations and research status
+
+- **Healthy-volunteer cohort:** experiments were carried out with non-amputees; results must not be generalized to people with limb loss without dedicated validation.
+- **Participant-specific versus unseen participants:** 82.0–88.4% reflects the primary offline analysis, while subject-disjoint evaluation reached roughly 33–35%.
+- **Online performance:** real-time inference infrastructure exists, but online accuracy was not yet satisfactory.
+- **Hardware deployment:** architecture choices considered a 1 MB flash constraint; successful on-device prosthesis deployment was not demonstrated.
+- **Data availability:** the repository contains research code; clinical/human-subject data or complete model artifacts should not be assumed publicly available.
+- **Next steps:** strengthen online robustness, improve unseen-user generalization, and evaluate with prosthesis users under appropriate approvals.
+
+## Thesis and attribution
+
+**Claudio Demaria (2024).** *Sensor Fusion for Enhancing Prosthesis Control: Overcoming the Limb Position Effect and Dynamic Movement Variability Using EMG and IMU Data.* MSc in Robotics Engineering, University of Genoa. Research undertaken at the Center for Bionics and Pain Research, Gothenburg, Sweden. Supervisors: Prof. Maura Casadio and Dr. Fabian Just.
+
+This README summarizes results from the thesis (not an independently peer-reviewed publication). The Delsys acquisition interface used adaptations of the pre-existing LocoD framework. The study's participant data were collected with research ethics approval as described in the thesis.
+
+**Contact:** [Claudio Demaria](https://github.com/claudioDema99)
