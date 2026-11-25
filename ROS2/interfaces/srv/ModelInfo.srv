@@ -1,0 +1,14 @@
+int64 info_request
+---
+string[] model_type
+string[] input_type
+int64[] num_classes
+int64[] hidden_sizes_emg
+int64[] hidden_sizes_imu
+int64[] input_shape_emg
+int64[] input_shape_imu
+float64[] dropout_rate
+int32[] batch_size
+int32[] epochs
+string[] optimizer
+float64[] learning_rate
